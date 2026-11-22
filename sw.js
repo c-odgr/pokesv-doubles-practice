@@ -1,5 +1,5 @@
 // 047: keeps the app, Pyodide and the sprites seen so far, so the page opens without a network.
-const VERSION = "115826503567";
+const VERSION = "a26535a6fa4d";
 const PYODIDE = new URL("pyodide/", self.location).href;  // (served with the site)
 const CORE = ["./", "index.html", "worker.js", "pokesv_sim.zip", "manifest.webmanifest", "icon.svg",
   ...["pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"].map((f) => "pyodide/" + f)];

@@ -196,6 +196,8 @@ small.note { color:var(--sub); font-size:11px; }
   transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-out); }
 @starting-style { .pop { opacity:0; transform:translate(-50%,-60%); } }
 .pop.up { background:var(--up); } .pop.down { background:var(--down); } .pop.good { background:#2a9d4b; } .pop.bad { background:#6b7280; }
+/* 依頼者 2026-11-23: other events (an item used up, an ability) had no background: white on white */
+.pop.info { background:#374151; }
 .stage.flash { animation: stageflash 400ms var(--ease-out); }
 @keyframes stageflash { 0%{ transform:scale(0.95); opacity:.4 } 100%{ transform:none; opacity:1 } }
 .toast { position:absolute; z-index:5; left:50%; top:8px; transform:translateX(-50%); pointer-events:none; background:var(--ink); color:var(--card); border-radius:999px; padding:4px 14px; font-size:13px; font-weight:700; white-space:nowrap;
@@ -671,7 +673,7 @@ async function show(e, step) {  // what one event looks like; returns how long t
     dismiss(overlay("toast", e.text), step * 1.2); return step * 0.8;
   }
   if (k === "win" || k === "tie") { dismiss(overlay("banner", e.text), step * 2); return step * 1.5; }
-  if (e.target || e.actor) { pop(slotEl(e.target || e.actor), e.text.replace(/^相手の/, ""), ""); return step * 0.6; }
+  if (e.target || e.actor) { pop(slotEl(e.target || e.actor), e.text.replace(/^相手の/, ""), "info"); return step * 0.6; }
   return step * 0.4;
 }
 

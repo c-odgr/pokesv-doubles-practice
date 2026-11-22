@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ダブルバトル練習</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23fff' stroke='%23222' stroke-width='3'/%3E%3Cpath d='M2 16h28' stroke='%23222' stroke-width='3'/%3E%3Cpath d='M2.2 14A14 14 0 0 1 29.8 14Z' fill='%23e04a3a'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff' stroke='%23222' stroke-width='3'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#2f6fde">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ダブル練習">
+<style>
+/* 044: tokens first (palette, motion), then components. Motion follows emil-design-eng:
+   UI moves under 300ms with ease-out, exits are shorter, only transform/opacity move. */
+:root {
+  color-scheme: light;
+  --field:#ffffff; --field-ink:#111827; --field-line:#9aa3b5; --ph:#6b7280;
+  --bg:#f4f5f8; --card:#fff; --ink:#1d2330; --sub:#4b5563; --line:#d8dce3;
+  --accent:#2f6fde; --me:#2f6fde; --foe:#d2483a;
+  --hp:#3bb55a; --mid:#e0b020; --low:#e04a3a;
+  --up:#2f7de1; --down:#e0483a;
+  --arena-sky:#e9f0fb; --arena-ground:#dfe9d8;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --step: 650ms;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --field:#0f1217; --field-ink:#f3f5f9; --field-line:#5b6576; --ph:#9aa3b5;
+    --bg:#121519; --card:#1c2129; --ink:#eef1f6; --sub:#b4bccb; --line:#363e4b;
+    --accent:#7aa5ff; --me:#7aa5ff; --foe:#ff7b6b; --up:#6fa8ff; --down:#ff6f61;
+    --arena-sky:#1a2232; --arena-ground:#1d2a22;
+  }
+}
+* { box-sizing:border-box; }
+body { margin:0; font-family: system-ui, "Yu Gothic UI", "Meiryo", sans-serif; background:var(--bg); color:var(--ink); }
+header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+header h1 { font-size:17px; margin:0; letter-spacing:-0.01em; }
+main { max-width:1500px; margin:0 auto; padding:12px 16px; display:grid; grid-template-columns: minmax(0,1fr) 340px; gap:14px; }
+body.setup main { grid-template-columns: minmax(0,1fr); max-width:1800px; }
+body.setup aside { display:none; }
+.cols > * { min-width:0; }
+.members > * { min-width:0; }
+.members input[type=text], .members input:not([type]) { min-width:0 !important; }
+.members { display:grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:8px; }
+.members > .card { margin:0 !important; }
+@media (min-width: 1500px) { body.setup .cols { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1499px) { body.setup .cols { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; }
+h2 { font-size:14px; margin:0 0 8px; color:var(--sub); }
+.row { display:flex; gap:10px; flex-wrap:wrap; }
+.mon { flex:1 1 230px; border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; gap:8px; min-width:0; }
+.mon.small { flex:0 1 170px; font-size:12px; }
+.mon.fainted { opacity:.45; }
+.pic { width:64px; height:64px; flex:none; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; font-size:20px; overflow:hidden; position:relative; }
+.mon.small .pic { width:44px; height:44px; font-size:15px; }
+.pic img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; position:absolute; inset:0; }
+body.silhouette .pic img { filter: brightness(0); }
+body.silhouette.dark-sil .pic img { filter: brightness(0) invert(1); }
+.info { min-width:0; flex:1; }
+.name { font-weight:700; overflow-wrap:anywhere; }
+.fullname { font-weight:700; font-size:16px; overflow-wrap:anywhere; line-height:1.3; }
+.members select { flex:1 1 auto; min-width:0; max-width:100%; }
+.members .row > * { min-width:0; }
+.meta { font-size:12px; color:var(--sub); }
+.tag { display:inline-block; font-size:11px; padding:1px 7px; border-radius:9px; background:var(--line); margin:1px 2px 1px 0; }
+.tag.st { background:#c0504d; color:#fff; }
+.tag.tera { color:#fff; }
+button, select, textarea, input { font:inherit; color:inherit; }
+button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 14px; cursor:pointer; transition: transform 120ms var(--ease-out), opacity 150ms ease; }
+button:active:not(:disabled) { transform: scale(0.97); }
+button:focus-visible, .tgt:focus-visible, .swcard:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+button.opt { background:var(--card); color:var(--ink); border:1px solid var(--line); text-align:left; display:block; width:100%; margin:3px 0; padding:6px 10px; }
+button.opt.sel { border-color:var(--accent); outline:2px solid var(--accent); }
+button:disabled { opacity:.5; cursor:default; }
+textarea { width:100%; height:140px; padding:6px; font-size:12px; }
+input, select, textarea { background:var(--field); color:var(--field-ink); border:1px solid var(--field-line); border-radius:7px; padding:5px; max-width:100%; font-weight:600; }
+input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:0; border-color:var(--accent); }
+input::placeholder, textarea::placeholder { color:var(--ph); font-weight:400; opacity:1; }
+option { background:var(--field); color:var(--field-ink); }
+input[type=checkbox] { width:auto; }
+.cols { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+@media (max-width: 600px) { .cols { grid-template-columns: 1fr; } }
+.err { color:var(--low); white-space:pre-wrap; font-size:13px; }
+.pick { cursor:pointer; }
+.pick.sel { outline:3px solid var(--accent); }
+.num { font-size:11px; background:var(--accent); color:#fff; border-radius:9px; padding:0 6px; margin-left:4px; }
+small.note { color:var(--sub); font-size:11px; }
+.type { display:inline-block; font-size:11px; font-weight:700; color:#fff; padding:1px 8px; border-radius:4px; margin-right:3px; text-shadow:0 1px 1px rgba(0,0,0,.35); }
+.statbar { max-width:260px; display:grid; grid-template-columns: 56px 30px 1fr; gap:4px; align-items:center; font-size:11px; }
+.statbar .b { height:7px; border-radius:4px; }
+
+/* ---- 044: the arena ---- */
+.arena { position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--line);
+  background: linear-gradient(180deg, var(--arena-sky) 0%, var(--arena-sky) 48%, var(--arena-ground) 48%, var(--arena-ground) 100%); }
+.arena::before, .arena::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:0; transition: opacity 400ms ease; }
+.arena::before { background: var(--weather-bg, none); }
+.arena::after { background: var(--terrain-bg, none); }
+.arena.has-weather::before, .arena.has-terrain::after { opacity:1; }
+.arena.w-rain { --weather-bg: linear-gradient(180deg, rgba(60,110,200,.28), rgba(60,110,200,.08)), repeating-linear-gradient(105deg, transparent 0 14px, rgba(120,170,255,.18) 14px 15px); }
+.arena.w-sun { --weather-bg: radial-gradient(120% 70% at 85% -10%, rgba(255,190,60,.45), transparent 60%), linear-gradient(180deg, rgba(255,170,60,.14), transparent); }
+.arena.w-sand { --weather-bg: linear-gradient(180deg, rgba(196,150,80,.32), rgba(196,150,80,.14)), repeating-linear-gradient(170deg, transparent 0 9px, rgba(160,120,60,.12) 9px 10px); }
+.arena.w-snow { --weather-bg: linear-gradient(180deg, rgba(200,225,255,.4), rgba(230,240,255,.18)), radial-gradient(circle at 20% 30%, rgba(255,255,255,.6) 0 2px, transparent 3px) 0 0/48px 48px; }
+.arena.w-wind { --weather-bg: repeating-linear-gradient(90deg, transparent 0 40px, rgba(140,200,180,.16) 40px 42px); }
+.arena.t-electric { --terrain-bg: linear-gradient(0deg, rgba(250,200,0,.30), transparent 55%); }
+.arena.t-grassy { --terrain-bg: linear-gradient(0deg, rgba(60,170,60,.32), transparent 55%); }
+.arena.t-misty { --terrain-bg: linear-gradient(0deg, rgba(240,120,220,.28), transparent 55%); }
+.arena.t-psychic { --terrain-bg: linear-gradient(0deg, rgba(170,80,220,.30), transparent 55%); }
+.arena > * { position:relative; z-index:1; }
+.fieldbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:8px 10px; font-size:12px; min-height:36px; }
+.turnno { font-weight:800; font-variant-numeric: tabular-nums; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:2px 10px; }
+.chip { display:inline-flex; gap:5px; align-items:center; background:color-mix(in oklab, var(--card) 85%, transparent); border:1px solid var(--line); border-radius:999px; padding:2px 9px; font-size:12px; white-space:nowrap; }
+.chip .pips { display:inline-flex; gap:2px; }
+.chip .pips i { width:5px; height:5px; border-radius:50%; background:var(--sub); opacity:.85; }
+.chip .pips i.off { opacity:.2; }
+.sidebar { display:flex; gap:6px; flex-wrap:wrap; padding:0 10px; min-height:24px; align-items:center; }
+.sidebar .who { font-size:11px; font-weight:700; color:var(--sub); }
+.sidebar .who b { color:var(--ink); }
+/* 046: the latest AI's recommendation (shown only when asked, for practice) */
+.rec { position:relative; box-shadow: 0 0 0 2px #e0a800 inset; }
+.recmark { display:inline-block; font-size:10px; font-weight:800; color:#5a4300; background:#ffd65a; border-radius:5px; padding:0 5px; margin-left:4px; }
+.advice { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; font-size:13px; padding:8px 10px; border-radius:10px; margin-top:8px;
+  background:color-mix(in oklab, #ffd65a 18%, var(--card)); border:1px solid color-mix(in oklab, #e0a800 50%, var(--line)); }
+/* 046: while the AI thinks (shown at once after 決定) */
+.thinking { display:flex; gap:10px; align-items:center; margin-top:10px; font-weight:700; }
+.spinner { width:20px; height:20px; flex:none; border-radius:50%; border:3px solid var(--line); border-top-color:var(--accent); animation: spin 800ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: pulse 1.2s ease-in-out infinite !important; animation-duration:1.2s !important; animation-iteration-count: infinite !important; } }
+@keyframes pulse { 50% { opacity:.35; } }
+.advtoggle { font-size:12px; color:var(--sub); display:inline-flex; gap:6px; align-items:center; }
+.slots { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:6px 10px 10px; }
+.slots.foe { padding-left:22%; }
+.slots.me { padding-right:22%; }
+@media (max-width: 640px) { .slots.foe { padding-left:10px; } .slots.me { padding-right:10px; } }
+.slot { position:relative; display:flex; gap:8px; align-items:center; min-width:0; border-radius:12px; padding:6px; background:color-mix(in oklab, var(--card) 88%, transparent); border:1px solid var(--line); transition: box-shadow 200ms var(--ease-out); }
+.slots.foe .slot { border-top:3px solid var(--foe); }
+.slots.me .slot { border-top:3px solid var(--me); }
+.slot.empty { justify-content:center; color:var(--sub); font-size:12px; min-height:84px; }
+.slot.targeted { box-shadow: 0 0 0 3px var(--accent); }
+.slot .sprite { width:72px; height:72px; flex:none; position:relative; }
+.slot .sprite .pic { width:72px; height:72px; border-radius:50%; }
+@media (max-width: 640px) {
+  .slot { flex-direction:column; align-items:stretch; gap:4px; }
+  .slot .sprite { align-self:center; }
+  .slot .sprite, .slot .sprite .pic { width:52px; height:52px; }
+  .slot .nm { font-size:13px; }
+  .slot .stage .bars { display:none; }
+}
+.slot .panel { min-width:0; flex:1; }
+.slot .nm { font-weight:800; font-size:14px; line-height:1.25; overflow-wrap:anywhere; }
+.hpbar { height:8px; border-radius:5px; background:var(--line); overflow:hidden; margin:5px 0 2px; }
+.hpbar > i { display:block; height:100%; width:100%; transform-origin:left center; transform:scaleX(var(--p, 1)); background:var(--hp);
+  transition: transform 450ms var(--ease-out), background-color 200ms ease; }
+.hpbar.mid > i { background:var(--mid); }
+.hpbar.low > i { background:var(--low); }
+.hptext { font-size:12px; color:var(--sub); font-variant-numeric: tabular-nums; }
+.stages { display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+.stage { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700; border-radius:6px; padding:1px 6px; color:#fff; }
+.stage.up { background:var(--up); }
+.stage.down { background:var(--down); }
+.stage .bars { display:inline-grid; grid-template-columns: repeat(6, 4px); gap:1px; }
+.stage .bars i { height:8px; border-radius:1px; background:rgba(255,255,255,.95); }
+.stage .bars i.off { background:rgba(255,255,255,.3); }
+.bench { display:flex; gap:6px; flex-wrap:wrap; padding:0 10px 10px; }
+.bench .b { display:flex; gap:6px; align-items:center; font-size:12px; border:1px solid var(--line); border-radius:999px; padding:2px 10px 2px 2px; background:color-mix(in oklab, var(--card) 85%, transparent); }
+.bench .b .pic { width:28px; height:28px; border-radius:50%; font-size:11px; }
+.bench .b.fainted { opacity:.45; }
+.bench .mini { width:46px; height:4px; border-radius:3px; background:var(--line); overflow:hidden; }
+.bench .mini > i { display:block; height:100%; background:var(--hp); }
+
+/* moments of the replay (each answers something that happened) */
+.banner { position:absolute; left:50%; top:50%; z-index:5; transform:translate(-50%,-50%); pointer-events:none;
+  background:var(--card); color:var(--ink); border-left:8px solid var(--mc, var(--accent)); border-radius:10px; padding:8px 16px;
+  font-weight:800; font-size:17px; box-shadow:0 8px 24px rgba(0,0,0,.18); white-space:nowrap; max-width:92%; overflow:hidden; text-overflow:ellipsis;
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out); }
+@starting-style { .banner { opacity:0; transform:translate(-50%,-50%) scale(0.95); } }
+.banner.out { opacity:0; transition-duration:140ms; }
+.slot.acting { transform: translateY(-4px); transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out); box-shadow:0 6px 18px rgba(0,0,0,.18); }
+.slot.hit .sprite { animation: hit 300ms var(--ease-out); }
+@keyframes hit { 0%{transform:translateX(0)} 20%{transform:translateX(-6px)} 45%{transform:translateX(5px)} 70%{transform:translateX(-3px)} 100%{transform:translateX(0)} }
+.slot.hit .sprite::after { content:""; position:absolute; inset:0; border-radius:50%; background:#fff; opacity:0; animation: flash 240ms ease-out; }
+@keyframes flash { 0%{opacity:.75} 100%{opacity:0} }
+.slot.heal .hpbar { box-shadow:0 0 0 2px var(--hp); transition: box-shadow 200ms ease; }
+.slot.fainting .sprite { transform: translateY(18px); opacity:0; transition: transform 320ms var(--ease-in-out), opacity 320ms ease; }
+.slot.switching .sprite { animation: enter 260ms var(--ease-out); }
+@keyframes enter { from { transform: scale(0.95); opacity:0; } to { transform:none; opacity:1; } }
+.slot.tera .sprite .pic { box-shadow: 0 0 0 3px var(--tc, #44628d), 0 0 18px var(--tc, #44628d); transition: box-shadow 250ms var(--ease-out); }
+.pop { position:absolute; z-index:4; left:50%; top:-6px; transform:translate(-50%,-100%); pointer-events:none; font-size:12px; font-weight:800; padding:2px 8px; border-radius:999px; color:#fff; background:var(--ink); white-space:nowrap;
+  transition: opacity 180ms var(--ease-out), transform 220ms var(--ease-out); }
+@starting-style { .pop { opacity:0; transform:translate(-50%,-60%); } }
+.pop.up { background:var(--up); } .pop.down { background:var(--down); } .pop.good { background:#2a9d4b; } .pop.bad { background:#6b7280; }
+.stage.flash { animation: stageflash 400ms var(--ease-out); }
+@keyframes stageflash { 0%{ transform:scale(0.95); opacity:.4 } 100%{ transform:none; opacity:1 } }
+.toast { position:absolute; z-index:5; left:50%; top:8px; transform:translateX(-50%); pointer-events:none; background:var(--ink); color:var(--card); border-radius:999px; padding:4px 14px; font-size:13px; font-weight:700; white-space:nowrap;
+  transition: opacity 180ms var(--ease-out), transform 200ms var(--ease-out); }
+@starting-style { .toast { opacity:0; transform:translate(-50%,-6px); } }
+.replaybar { display:flex; gap:8px; align-items:center; justify-content:space-between; padding:6px 10px; border-top:1px solid var(--line); font-size:12px; color:var(--sub); background:color-mix(in oklab, var(--card) 80%, transparent); }
+.replaybar .speed { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.replaybar .speed button { background:transparent; color:var(--ink); border-radius:0; padding:3px 10px; font-size:12px; }
+.replaybar .speed button.on { background:var(--accent); color:#fff; }
+
+/* ---- 044: choosing the turn ---- */
+.movecard { border:1px solid var(--line); border-left:6px solid var(--mc); border-radius:10px; padding:7px 9px; margin:6px 0; background:var(--card); }
+.movecard.sel { outline:2px solid var(--accent); }
+.movecard .mhead { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+.movecard .mname { font-weight:800; font-size:15px; }
+.movecard .key { font-size:11px; color:var(--sub); border:1px solid var(--line); border-radius:5px; padding:0 5px; font-variant-numeric: tabular-nums; }
+.eff { display:inline-block; font-size:11px; font-weight:800; border-radius:5px; padding:0 5px; margin-left:4px; }
+.eff.x4, .eff.x2 { background:#2a9d4b; color:#fff; } .eff.xh, .eff.xq { background:#8a94a6; color:#fff; } .eff.x0 { background:#3d4350; color:#fff; } .eff.x1 { background:var(--line); color:var(--ink); }
+.tgt { display:inline-flex; gap:4px; align-items:center; margin:5px 5px 0 0; padding:4px 11px; border-radius:999px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:12px; }
+.tgt.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+.swcard { display:flex; gap:6px; align-items:center; border:1px dashed var(--line); border-radius:10px; padding:4px 8px; margin:5px 0; background:var(--card); color:var(--ink); width:100%; text-align:left; }
+.swcard.sel { outline:2px solid var(--accent); }
+.swcard .pic { width:32px; height:32px; font-size:12px; border-radius:50%; }
+.summary { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; font-size:13px; padding:8px 10px; border-radius:10px; background:var(--bg); border:1px solid var(--line); margin-top:8px; }
+.summary b { font-weight:800; }
+.summary .todo { color:var(--sub); }
+
+/* ---- log ---- */
+.log { height:560px; overflow:auto; font-size:13px; line-height:1.55; white-space:pre-wrap; }
+.log .turn { color:var(--accent); font-weight:800; margin-top:6px; }
+.log .ev-faint { color:var(--low); font-weight:700; }
+.log .ev-good { color:#2a9d4b; }
+.log .ev-foe { color:var(--sub); }
+.log .tblock { border-top:1px solid var(--line); margin-top:6px; padding-top:4px; }
+.log .now { background:color-mix(in oklab, var(--accent) 14%, transparent); border-radius:4px; }
+@media (max-width: 960px) { .log { height:260px; } }
+
+/* 045: fingers on a phone: 44px targets, no double-tap zoom on buttons */
+@media (pointer: coarse) {
+  button, .tgt, .swcard, .pick, select, input { min-height:44px; touch-action: manipulation; }
+  .tgt { padding:8px 14px; }
+  .replaybar .speed button { min-height:36px; padding:4px 14px; }
+}
+.phone { font-size:12px; color:var(--sub); overflow-wrap:anywhere; }
+.phone code { user-select:all; color:var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
+  .slot, .slot .sprite, .hpbar > i, .banner, .pop, .toast, button { transition-property: opacity, background-color, box-shadow !important; }
+  .slot.acting { transform:none; }
+}
+</style>
+</head>
+<body>
+<div id="boot" class="card thinking" role="status" aria-live="polite" style="position:fixed;left:50%;top:40%;transform:translateX(-50%);z-index:50;max-width:calc(100vw - 32px)"><span class="spinner" aria-hidden="true"></span><span>準備しています…</span></div>
+
+<header>
+  <h1>ダブルバトル練習</h1>
+  <label><input type="checkbox" id="sil"> シルエット表示</label>
+  <button id="newbtn" style="margin-left:auto">新しい対戦</button>
+</header>
+<main>
+  <section id="left"></section>
+  <aside class="card"><h2>ログ</h2><div class="log" id="log" aria-live="polite"></div></aside>
+</main>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let options = null, state = null, lastKey = "", draft = null, phoneUrl = "";
+
+try { if (localStorage.getItem("sil") === "1") $("#sil").checked = true; } catch (e) {}
+const applySil = () => { document.body.classList.toggle("silhouette", $("#sil").checked);
+  document.body.classList.toggle("dark-sil", matchMedia("(prefers-color-scheme: dark)").matches); };
+$("#sil").onchange = () => { applySil(); try { localStorage.setItem("sil", $("#sil").checked ? "1" : "0"); } catch (e) {} };
+applySil();
+
+function pic(m) {
+  const bg = m.colors && m.colors.length ? (m.colors.length > 1 ? `linear-gradient(135deg, ${m.colors[0]} 50%, ${m.colors[1]} 50%)` : m.colors[0]) : "#888";
+  const img = m.sprite ? `<img src="${esc(m.sprite)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  return `<div class="pic" style="background:${bg}">${esc((m.name || "?")[0])}${img}</div>`;
+}
+const typeBadges = (m) => (m.types_ja || []).map((t, i) => `<span class="type" style="background:${m.colors[i]}">${esc(t)}</span>`).join("");
+
+// 045: the key from "?key=" is kept here too (some phone browsers keep no cookies) and sent
+// with every request; the address bar drops it
+let accessKey = "";
+try {
+  const k = new URLSearchParams(location.search).get("key");
+  if (k) { localStorage.setItem("key", k.trim()); history.replaceState(null, "", "/"); }
+  accessKey = localStorage.getItem("key") || "";
+} catch (e) {}
+// 047: the offline version: the engine runs in a worker in this browser
+const engine = new Worker("worker.js");
+const waiting = new Map();
+let calls = 0;
+engine.onmessage = (e) => {
+  const { id, ok, data, error, text } = e.data;
+  if (id === 0) { const b = document.getElementById("boot"); if (b) { b.hidden = !text; b.querySelector("span").textContent = text; } return; }
+  const w = waiting.get(id); waiting.delete(id);
+  if (ok) w[0](data); else w[1](new Error(error));
+};
+function api(path, body) {
+  return new Promise((resolve, reject) => {
+    calls += 1; waiting.set(calls, [resolve, reject]);
+    engine.postMessage({ id: calls, path, body: body === undefined ? null : JSON.stringify(body) });
+  });
+}
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+function renderSetup(msg) {
+  document.body.classList.add("setup");
+  const ais = options.ais.map((a) => `<option value="${a.id}" ${a.id === options.default ? "selected" : ""}>${esc(a.label)}</option>`).join("");
+  const teams = options.teams.map((t) => `<option value="${esc(t.id)}">${esc(t.id)}　${esc(t.names)}</option>`).join("");
+  const side = (k, title) => `<div><h2>${title}</h2>
+    <select id="${k}mode"><option value="build">自分で組む</option><option value="regf">大会のチーム</option><option value="text">テキストを貼る</option></select>
+    <div id="${k}build"></div>
+    <select id="${k}sel" style="width:100%;display:none">${teams}</select>
+    <textarea id="${k}txt" style="display:none" placeholder="Showdown 形式（英語名）のチームを貼る"></textarea></div>`;
+  $("#left").innerHTML = `<div class="card"><h2>新しい対戦</h2>
+    <datalist id="dl-species">${catalog.species.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
+    <datalist id="dl-items">${catalog.items.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
+    <div class="cols">${side("mine", "あなたのチーム")}${side("foe", "相手のチーム")}</div>
+    <p>相手の AI: <select id="ai">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span></p>
+    <p><label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}> 最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する（学習用。対戦中にも切り替えられる）</label></p>
+    <button id="start">対戦を始める</button> <span class="err" id="err">${esc(msg || "")}</span>
+    ${phoneUrl ? `<p class="phone">スマホで開く（同じ Wi-Fi）: <code>${esc(phoneUrl)}</code><br>鍵つきの URL です。他の人に見せないでください。</p>` : ""}
+    <p><small class="note">ポケモンの画像は同梱していません。遊ぶときにブラウザが PokeAPI/sprites から読み込みます（著作権は任天堂・クリーチャーズ・ゲームフリークにあります）。読み込めないときはタイプの色で表示します。</small></p></div>`;
+  const aidesc = () => { const a = options.ais.find((x) => x.id === $("#ai").value); $("#aidesc").textContent = a ? a.desc : ""; };
+  $("#ai").onchange = aidesc; aidesc();
+  $("#advset").onchange = (e) => setAdvice(e.target.checked);
+  for (const k of ["mine", "foe"]) {
+    const mode = $(`#${k}mode`);
+    try { mode.value = localStorage.getItem("mode-" + k) || "build"; } catch (e) {}
+    const show = () => { $(`#${k}build`).style.display = mode.value === "build" ? "" : "none";
+      $(`#${k}sel`).style.display = mode.value === "regf" ? "" : "none";
+      $(`#${k}txt`).style.display = mode.value === "text" ? "" : "none";
+      try { localStorage.setItem("mode-" + k, mode.value); } catch (e) {} };
+    mode.onchange = show; show(); renderBuilder(k);
+  }
+  $("#start").onclick = async () => {
+    for (const k of ["mine", "foe"]) {
+      const w = $(`#${k}mode`).value === "build" ? builderWarnings(builds[k]) : [];
+      if (w.length) { $("#err").textContent = (k === "mine" ? "自分" : "相手") + "のチームを直してください: " + w[0]; return; }
+    }
+    const pick = (k) => { const m = $(`#${k}mode`).value;
+      if (m === "build") return { members: builds[k].filter((x) => x.species).map(memberJson) };
+      return m === "regf" ? $(`#${k}sel`).value : $(`#${k}txt`).value; };
+    const r = await api("/api/new", { mine: pick("mine"), foe: pick("foe"), ai: $("#ai").value, seed: $("#seed").value });
+    if (!r.ok) { $("#err").textContent = r.error; return; }
+    lastKey = ""; draft = null; poll();
+  };
+}
+
+// ---- team builder (039): Japanese pull-downs, teams kept in this browser ----
+let catalog = null;
+const details = {};
+const STATS = [["hp", "HP"], ["atk", "こうげき"], ["def", "ぼうぎょ"], ["spa", "とくこう"], ["spd", "とくぼう"], ["spe", "すばやさ"]];
+const blank = () => ({ species: "", item: "", ability: "", nature: "Serious", tera: "", moves: ["", "", "", ""], evs: {} });
+const load = (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
+const save = (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} };
+const builds = { mine: load("build-mine", null) || [1, 2, 3, 4, 5, 6].map(blank), foe: load("build-foe", null) || [1, 2, 3, 4, 5, 6].map(blank) };
+// typed names: hiragana counts as katakana; an exact name, else the first that starts with it, else contains it
+const kata = (t) => String(t || "").trim().replace(/[\u3041-\u3096]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+const byName = (list, name) => { const q = kata(name); if (!q) return undefined;
+  return list.find((x) => kata(x.name) === q) || list.find((x) => kata(x.name).startsWith(q)) || list.find((x) => kata(x.name).includes(q)); };
+const memberJson = (m) => ({ species: m.species, item: m.item, ability: m.ability, nature: m.nature, tera: m.tera, moves: m.moves, evs: m.evs, ivs: m.ivs || {} });
+
+async function detail(id) { if (!details[id]) details[id] = await api("/api/species?id=" + encodeURIComponent(id)); return details[id]; }
+
+function renderBuilder(k) {
+  const el = $(`#${k}build`);
+  const saved = load("teams", {});
+  const opts = (list, cur, empty) => (empty ? `<option value="">${empty}</option>` : "") + list.map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? "selected" : ""}>${esc(x.name)}</option>`).join("");
+  const rows = builds[k].map((m, i) => {
+    const sp = catalog.species.find((s) => s.id === m.species);
+    const d = m.species ? details[m.species] : null;
+    const it = catalog.items.find((x) => x.id === m.item);
+    const moveSel = (j) => `<select data-f="move" data-j="${j}">${opts(d ? d.moves : [], m.moves[j], "（技）")}</select>`;
+    const total = STATS.reduce((a, [s]) => a + (+m.evs[s] || 0), 0);
+    return `<div class="card" style="padding:8px;margin:6px 0" data-i="${i}">
+      <div class="row" style="gap:6px;align-items:center">${sp && d ? pic(d) : ""}
+        <div style="flex:1 1 100%;min-width:0">${sp ? `<div class="fullname">${esc(sp.name)}${it ? `<span class="meta" style="font-weight:400"> ＠${esc(it.name)}</span>` : ""}</div>` : ""}</div>
+        <input list="dl-species" data-f="species" placeholder="${i + 1}体目のポケモン" value="${esc(sp ? sp.name : "")}" title="${esc(sp ? sp.name : "")}" style="flex:1 1 200px">
+        <input list="dl-items" data-f="item" placeholder="持ち物" value="${esc(it ? it.name : "")}" title="${esc(it ? it.name : "")}" style="flex:1 1 160px">
+        ${k === "foe" && m.species ? `<button class="opt" data-f="reroll" style="display:inline-block;width:auto">大会の型を引き直す</button>` : ""}</div>
+      ${m.warn ? `<div class="err">${esc(m.warn)}</div>` : ""}
+      ${!d ? `<div class="meta" style="margin-top:4px">ポケモンの名前を入力（ひらがなでも可・一部でも可）すると、特性・性格・テラスタイプ・技・努力値の欄が出ます</div>` : ""}
+      ${d ? `<div class="row" style="gap:12px;margin-top:4px;align-items:center"><div>${typeBadges(d)}</div><div style="flex:1;min-width:200px">${baseBars(d)}</div></div>` : ""}
+      ${d ? `<div class="row" style="gap:6px;margin-top:4px">
+        <select data-f="ability">${opts(d.abilities, m.ability)}</select>
+        <select data-f="nature">${opts(catalog.natures, m.nature)}</select>
+        <select data-f="tera">${opts(catalog.types, m.tera, "テラスタイプ（既定）")}</select></div>
+        <div class="row" style="gap:6px;margin-top:4px">${[0, 1, 2, 3].map(moveSel).join("")}</div>
+        <div style="overflow-x:auto"><table class="meta" style="margin-top:4px;border-collapse:collapse;white-space:nowrap"><tr><td></td>${STATS.map(([, n]) => `<td style="padding:0 4px">${n}</td>`).join("")}</tr>
+        <tr><td>努力値</td>${STATS.map(([s]) => `<td><input type="number" min="0" max="252" step="4" data-f="ev" data-s="${s}" value="${m.evs[s] || 0}" style="width:48px"></td>`).join("")}<td style="${total > 508 ? "color:var(--low);font-weight:700" : ""}">計 ${total}/508</td></tr>
+        <tr><td>個体値</td>${STATS.map(([s]) => `<td><input type="number" min="0" max="31" data-f="iv" data-s="${s}" value="${m.ivs && m.ivs[s] !== undefined ? m.ivs[s] : 31}" style="width:48px"></td>`).join("")}</tr>
+        <tr><td>実数値</td>${STATS.map(([s]) => `<td style="padding:0 4px;font-weight:700;color:var(--ink);font-size:13px">${statOf(d, m, s)}</td>`).join("")}<td>（Lv50）</td></tr></table></div>` : ""}
+    </div>`;
+  }).join("");
+  const warn = builderWarnings(builds[k]);
+  el.innerHTML = `<div class="row" style="gap:6px;align-items:center;margin:6px 0">
+      <select data-f="load"><option value="">保存したチームを読み込む</option>${Object.keys(saved).map((n) => `<option>${esc(n)}</option>`).join("")}</select>
+      <input type="text" data-f="name" placeholder="チーム名" size="10"><button data-f="save" class="opt" style="display:inline-block;width:auto">保存</button>
+      <button data-f="clear" class="opt" style="display:inline-block;width:auto">空にする</button>
+      <select data-f="regf" style="max-width:220px"><option value="">大会のチームを読み込んで編集</option>${options.teams.map((t) => `<option value="${esc(t.id)}">${esc(t.id)}　${esc(t.names)}</option>`).join("")}</select></div>
+      ${warn.length ? `<div class="err">${warn.map(esc).join("<br>")}</div>` : ""}<div class="members">${rows}</div>`;
+  const changed = () => { save("build-" + k, builds[k]); renderBuilder(k); };
+  el.querySelectorAll("[data-i]").forEach((row) => {
+    const m = builds[k][+row.dataset.i];
+    row.querySelectorAll("[data-f]").forEach((input) => input.onchange = async () => {
+      const f = input.dataset.f;
+      if (f === "species") {
+        const sp = byName(catalog.species, input.value);
+        Object.assign(m, blank(), { species: sp ? sp.id : "" });
+        if (!sp && input.value.trim()) m.warn = `「${input.value.trim()}」に当たるポケモンが見つかりません（エンジンが対応していない・レギュF で使えない可能性があります）`;
+        if (sp) { const d = await detail(sp.id); m.ability = d.abilities.length ? d.abilities[0].id : ""; if (d.required_item) m.item = d.required_item.toLowerCase().replace(/[^a-z0-9]/g, "");
+          if (k === "foe") await randomSet(m); }
+      } else if (f === "reroll") { await randomSet(m);
+      } else if (f === "item") { const it = byName(catalog.items, input.value); m.item = it ? it.id : "";
+        m.warn = !it && input.value.trim() ? `「${input.value.trim()}」に当たる持ち物が見つかりません` : ""; }
+      else if (f === "move") m.moves[+input.dataset.j] = input.value;
+      else if (f === "ev") m.evs[input.dataset.s] = Math.max(0, Math.min(252, +input.value || 0));
+      else if (f === "iv") { m.ivs = m.ivs || {}; m.ivs[input.dataset.s] = Math.max(0, Math.min(31, +input.value || 0)); }
+      else m[f] = input.value;
+      changed();
+    });
+    row.querySelectorAll('[data-f="reroll"]').forEach((b) => { b.onclick = b.onchange; });
+  });
+  el.querySelector('[data-f="save"]').onclick = () => { const n = el.querySelector('[data-f="name"]').value.trim(); if (!n) return;
+    const all = load("teams", {}); all[n] = builds[k]; save("teams", all); renderBuilder(k); };
+  el.querySelector('[data-f="load"]').onchange = (e) => { const t = load("teams", {})[e.target.value]; if (!t) return;
+    builds[k] = JSON.parse(JSON.stringify(t)); Promise.all(builds[k].filter((m) => m.species).map((m) => detail(m.species))).then(changed); };
+  el.querySelector('[data-f="clear"]').onclick = () => { builds[k] = [1, 2, 3, 4, 5, 6].map(blank); changed(); };
+  el.querySelector('[data-f="regf"]').onchange = async (e) => { if (!e.target.value) return;
+    const t = await api("/api/team?id=" + encodeURIComponent(e.target.value)); if (!t.length) return;
+    while (t.length < 6) t.push(blank());
+    await Promise.all(t.filter((m) => m.species).map((m) => detail(m.species)));
+    builds[k] = t; changed(); };
+}
+
+async function randomSet(m) {  // the foe: a common tournament set of the species, at random
+  const set = await api("/api/randomset?id=" + encodeURIComponent(m.species));
+  if (set && set.species) { Object.assign(m, set); m.warn = ""; }
+  else m.warn = "このポケモンは大会のチームにいないので、型を手で設定してください";
+}
+
+function baseBars(d) {
+  const total = STATS.reduce((a, [s]) => a + d.base[s], 0);
+  return STATS.map(([s, n]) => { const v = d.base[s], c = v >= 120 ? "#2a9d4b" : v >= 90 ? "#7cb342" : v >= 60 ? "#e0b020" : "#e07a3a";
+    return `<div class="statbar"><span>${n}</span><b>${v}</b><div class="b" style="width:${Math.min(100, v / 1.6)}%;background:${c}"></div></div>`; }).join("") + `<div class="meta">種族値 合計 ${total}</div>`;
+}
+
+function statOf(d, m, s) {
+  const b = d.base[s], iv = m.ivs && m.ivs[s] !== undefined ? +m.ivs[s] : 31, ev = Math.floor((+m.evs[s] || 0) / 4);
+  if (s === "hp") return b === 1 ? 1 : Math.floor((2 * b + iv + ev) * 50 / 100) + 60;
+  const n = catalog.natures.find((x) => x.id === m.nature) || {};
+  const mod = n.plus === s ? 1.1 : n.minus === s ? 0.9 : 1;
+  return Math.floor((Math.floor((2 * b + iv + ev) * 50 / 100) + 5) * mod);
+}
+
+function builderWarnings(team) {
+  const out = [], seenS = {}, seenI = {};
+  team.forEach((m, i) => {
+    if (!m.species) return;
+    const name = (catalog.species.find((s) => s.id === m.species) || {}).name;
+    const total = STATS.reduce((a, [s]) => a + (+m.evs[s] || 0), 0);
+    if (total > 508) out.push(`${i + 1}体目（${name}）: 努力値の合計が ${total} で、508 を超えています`);
+    const base = (details[m.species] || {}).num;
+    if (seenS[base]) out.push(`${i + 1}体目（${name}）: 同じポケモンは1体まで（${seenS[base]}体目と同じ）`); else seenS[base] = i + 1;
+    if (m.item) { if (seenI[m.item]) out.push(`${i + 1}体目（${name}）: 同じ持ち物は1つまで（${seenI[m.item]}体目と同じ）`); else seenI[m.item] = i + 1; }
+    if (!m.moves.some(Boolean)) out.push(`${i + 1}体目（${name}）: 技を1つ以上選んでください`);
+  });
+  return out;
+}
+
+
+// ---- 044: the arena (foe above, own side below, as in the games) ----
+const toId = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const WEATHER = { raindance: "rain", primordialsea: "rain", sunnyday: "sun", desolateland: "sun", sandstorm: "sand",
+  snowscape: "snow", snow: "snow", hail: "snow", deltastream: "wind" };
+const TERRAIN = { electricterrain: "electric", grassyterrain: "grassy", mistyterrain: "misty", psychicterrain: "psychic" };
+let lastBoard = null;
+
+const hpClass = (p) => p > 50 ? "" : p > 20 ? "mid" : "low";
+const hpBar = (p) => `<div class="hpbar ${hpClass(p)}"><i style="--p:${Math.max(0, Math.min(100, p)) / 100}"></i></div>`;
+function stageChip(name, v) {
+  const n = Math.abs(v), bars = [0, 1, 2, 3, 4, 5].map((i) => `<i class="${i < n ? "" : "off"}"></i>`).join("");
+  return `<span class="stage ${v > 0 ? "up" : "down"}" data-stat="${esc(name)}" data-v="${v}" title="${esc(name)} ${v > 0 ? "+" : ""}${v}">${esc(name)}${v > 0 ? "▲" : "▼"}${n}<span class="bars" aria-hidden="true">${bars}</span></span>`;
+}
+function tagsHtml(m) {
+  let t = "";
+  if (m.status) t += `<span class="tag st">${esc(m.status)}</span>`;
+  if (m.confused) t += `<span class="tag">こんらん</span>`;
+  if (m.terastallized) t += `<span class="tag tera" style="background:#44628d">テラスタル ${esc(m.terastallized)}</span>`;
+  return t;
+}
+function slotHtml(key, m, mine) {
+  if (!m) return `<div class="slot empty" data-slot="${key}">（いない）</div>`;
+  const hp = mine ? `HP ${m.hp}/${m.max_hp}` : `HP ${m.percent}%`;
+  const extra = mine ? `<div class="meta">${esc([m.item, m.ability].filter(Boolean).join("・"))}</div>` : "";
+  return `<div class="slot ${m.terastallized ? "tera" : ""}" data-slot="${key}" data-max="${mine ? m.max_hp : 100}" data-mine="${mine ? 1 : 0}">
+    <div class="sprite">${pic(m)}</div>
+    <div class="panel"><div class="nm">${mine ? "" : "相手の "}${esc(m.name)} ${typeBadges(m)}</div>${hpBar(m.percent)}
+      <div class="hptext">${hp}</div><div class="tags">${tagsHtml(m)}</div>
+      <div class="stages">${(m.stages || []).map(([n, v]) => stageChip(n, v)).join("")}</div>${extra}</div></div>`;
+}
+function condChip(c) {
+  const pips = c.left ? `<span class="pips" aria-hidden="true">${Array.from({ length: Math.min(8, c.left) }, () => "<i></i>").join("")}</span>` : "";
+  return `<span class="chip" data-cond="${esc(c.id)}">${esc(c.name)}${c.layers ? " ×" + c.layers : ""}${c.left ? ` <span class="meta">あと${c.left}</span>` : ""}${pips}</span>`;
+}
+const benchHtml = (m) => `<span class="b ${m.fainted ? "fainted" : ""}">${pic(m)}<span>${esc(m.name)}</span><span class="mini"><i style="width:${m.percent}%"></i></span></span>`;
+
+function arenaHtml(b) {
+  lastBoard = b;
+  const active = [0, 1].map((pos) => b.team.find((m) => m.position === pos && !m.fainted));
+  const bench = b.team.filter((m) => b.brought.includes(m.index) && m.position === null);
+  const w = WEATHER[toId(b.weather_id)] || "", t = TERRAIN[toId(b.terrain_id)] || "";
+  const c = b.conditions || { field: [], me: [], foe: [] };
+  const foes = [0, 1].map((i) => b.foe_active[i] || null);
+  return `<div class="arena ${w ? "has-weather w-" + w : ""} ${t ? "has-terrain t-" + t : ""}" id="arena">
+    <div class="fieldbar"><span class="turnno">ターン ${b.turn}</span><span class="meta">相手 残り ${b.foe_left} 体</span>${c.field.map(condChip).join("")}</div>
+    <div class="sidebar" data-side="foe"><span class="who">相手: <b>${esc(state && state.ai_label || "")}</b></span>${c.foe.map(condChip).join("")}</div>
+    <div class="slots foe">${foes.map((m, i) => slotHtml("foe" + i, m, false)).join("")}</div>
+    <div class="slots me">${active.map((m, i) => slotHtml("me" + i, m, true)).join("")}</div>
+    <div class="sidebar" data-side="me"><span class="who"><b>あなた</b></span>${c.me.map(condChip).join("")}</div>
+    <div class="bench">${bench.map(benchHtml).join("") || '<span class="meta">控え なし</span>'}</div>
+    ${replayBar()}</div>`;
+}
+
+// ---- 044: replaying a turn's events on the arena ----
+const SPEEDS = [["normal", "ふつう", 650], ["fast", "はやい", 320], ["instant", "すぐ", 0]];
+let speed = (() => { try { return localStorage.getItem("speed") || "normal"; } catch (e) { return "normal"; } })();
+const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+let playing = false, skipping = false, waiters = [], shown = -1, lastTarget = null;
+
+function replayBar() {
+  return `<div class="replaybar"><span id="replaystat">${playing ? "再生中（クリック・Space で飛ばす）" : ""}</span>
+    <span>再生 <span class="speed" role="group" aria-label="再生の速さ">${SPEEDS.map(([id, n]) => `<button type="button" data-speed="${id}" class="${speed === id ? "on" : ""}" aria-pressed="${speed === id}">${n}</button>`).join("")}</span></span></div>`;
+}
+function wireArena() {
+  document.querySelectorAll("[data-speed]").forEach((b) => b.onclick = (e) => {
+    e.stopPropagation(); speed = b.dataset.speed;
+    try { localStorage.setItem("speed", speed); } catch (er) {}
+    document.querySelectorAll("[data-speed]").forEach((x) => { x.classList.toggle("on", x.dataset.speed === speed); x.setAttribute("aria-pressed", x.dataset.speed === speed); });
+  });
+  const a = $("#arena"); if (a) a.addEventListener("click", skip);
+}
+const sleep = (ms) => new Promise((r) => { if (skipping || ms <= 0) return r(); const t = setTimeout(r, ms); waiters.push(() => { clearTimeout(t); r(); }); });
+function skip() { if (!playing) return; skipping = true; waiters.splice(0).forEach((f) => f()); }
+document.addEventListener("keydown", (e) => { if (playing && (e.key === " " || e.key === "Enter")) { e.preventDefault(); skip(); } });
+
+const slotEl = (k) => k ? document.querySelector(`#arena [data-slot="${k}"]`) : null;
+function pop(el, text, cls) {
+  if (!el) return; const p = document.createElement("div"); p.className = "pop " + (cls || ""); p.textContent = text;
+  el.appendChild(p); setTimeout(() => { p.style.opacity = "0"; setTimeout(() => p.remove(), 200); }, 900);
+}
+function overlay(cls, text, color) {
+  const a = $("#arena"); if (!a) return null;
+  a.querySelectorAll("." + cls).forEach((x) => x.remove());
+  const b = document.createElement("div"); b.className = cls; b.textContent = text;
+  if (color) b.style.setProperty("--mc", color);
+  a.appendChild(b); return b;
+}
+function dismiss(b, after) { if (!b) return; setTimeout(() => { b.classList.add("out"); b.style.opacity = "0"; setTimeout(() => b.remove(), 160); }, after); }
+function setHp(el, v) {
+  const max = +el.dataset.max || 100, mine = el.dataset.mine === "1", p = mine ? Math.round(100 * v / max) : v;
+  const bar = el.querySelector(".hpbar"); if (!bar) return;
+  bar.className = "hpbar " + hpClass(p); bar.firstElementChild.style.setProperty("--p", Math.max(0, p) / 100);
+  el.querySelector(".hptext").textContent = mine ? `HP ${v}/${max}` : `HP ${v}%`;
+}
+function setBackdrop(kind, id) {
+  const a = $("#arena"); if (!a) return;
+  const table = kind === "w" ? WEATHER : TERRAIN, flag = kind === "w" ? "has-weather" : "has-terrain";
+  [...a.classList].filter((c) => c.startsWith(kind + "-")).forEach((c) => a.classList.remove(c));
+  const v = table[toId(id)];
+  a.classList.toggle(flag, !!v); if (v) a.classList.add(kind + "-" + v);
+}
+const POPS = { supereffective: ["ばつぐん！", "good"], resisted: ["いまひとつ", "bad"], crit: ["急所！", "good"],
+  miss: ["はずれ", "bad"], immune: ["効果なし", "bad"], fail: ["失敗", "bad"] };
+
+async function show(e, step) {  // what one event looks like; returns how long to hold it
+  const k = e.kind;
+  if (k === "turn") { const t = $("#arena .turnno"); if (t) t.textContent = `ターン ${e.turn}`; return step * 0.3; }
+  if (k === "move") {
+    const el = slotEl(e.actor), tg = slotEl(e.target);
+    el && el.classList.add("acting"); tg && tg.classList.add("targeted"); lastTarget = e.target || null;
+    const b = overlay("banner", e.text, e.color);
+    await sleep(step * 0.9);
+    dismiss(b, 0); el && el.classList.remove("acting"); tg && tg.classList.remove("targeted");
+    return 0;
+  }
+  if (k === "damage" || k === "heal") {
+    const el = slotEl(e.target); if (!el) return step * 0.3;
+    lastTarget = e.target;
+    if (k === "damage") { el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit"); }
+    else { el.classList.add("heal"); setTimeout(() => el.classList.remove("heal"), 500); }
+    if (e.hp !== undefined) setHp(el, e.hp);
+    return step * 0.8;
+  }
+  if (POPS[k]) { pop(slotEl(e.target || lastTarget) || slotEl(e.actor), ...POPS[k]); return step * 0.5; }
+  if (k === "faint") { const el = slotEl(e.target); el && el.classList.add("fainting"); return step; }
+  if (k === "switch" || k === "drag" || k === "replace") {
+    const el = slotEl(e.slot); if (!el) return step * 0.4;
+    const mine = e.slot.startsWith("me");
+    const own = mine && lastBoard ? lastBoard.team.find((m) => m.index === e.index) : null;
+    const m = own ? { ...own, stages: [] } : { ...e.species, percent: e.hp ?? 100, stages: [] };
+    if (own && e.hp !== undefined) { m.hp = e.hp; m.percent = Math.round(100 * e.hp / m.max_hp); }
+    const tmp = document.createElement("div"); tmp.innerHTML = slotHtml(e.slot, m, mine);
+    const n = tmp.firstElementChild; el.replaceWith(n); n.classList.add("switching");
+    return step;
+  }
+  if (k === "boost" || k === "unboost") {
+    const el = slotEl(e.target); if (!el) return step * 0.4;
+    const sign = k === "boost" ? 1 : -1, box = el.querySelector(".stages");
+    const chip = [...box.children].find((c) => c.dataset.stat === e.stat);
+    const v = Math.max(-6, Math.min(6, (chip ? +chip.dataset.v : 0) + sign * (e.value || 0)));
+    const tmp = document.createElement("div"); tmp.innerHTML = v ? stageChip(e.stat, v) : "";
+    const n = tmp.firstElementChild;
+    if (chip) { if (n) chip.replaceWith(n); else chip.remove(); } else if (n) box.appendChild(n);
+    if (n) n.classList.add("flash");
+    pop(el, e.value ? `${e.stat} ${sign > 0 ? "▲" : "▼"}${e.value}` : `${e.stat} もう変わらない`, sign > 0 ? "up" : "down");
+    return step * 0.7;
+  }
+  if (k === "status" || k === "curestatus") {
+    const el = slotEl(e.target); if (!el) return step * 0.4;
+    const tags = el.querySelector(".tags"); tags.querySelectorAll(".tag.st").forEach((x) => x.remove());
+    if (k === "status") { tags.insertAdjacentHTML("afterbegin", `<span class="tag st">${esc(e.status)}</span>`); pop(el, e.status, "down"); }
+    else pop(el, `${e.status} 回復`, "good");
+    return step * 0.7;
+  }
+  if (k === "terastallize") {
+    const el = slotEl(e.target); if (el) { el.style.setProperty("--tc", e.color); el.classList.add("tera"); }
+    dismiss(overlay("banner", e.text, e.color), step * 0.9); return step;
+  }
+  if (k === "weather") { setBackdrop("w", e.condition === "none" ? "" : e.condition); dismiss(overlay("toast", e.text), step * 1.2); return step * 0.8; }
+  if (k === "fieldstart" || k === "fieldend") {
+    if (TERRAIN[e.condition]) setBackdrop("t", k === "fieldstart" ? e.condition : "");
+    dismiss(overlay("toast", e.text), step * 1.2); return step * 0.8;
+  }
+  if (k === "sidestart" || k === "sideend") {
+    const bar = document.querySelector(`#arena .sidebar[data-side="${e.side}"]`);
+    if (bar) {
+      const old = bar.querySelector(`[data-cond="${e.condition}"]`);
+      if (k === "sideend") old && old.remove();
+      else if (!old) bar.insertAdjacentHTML("beforeend", condChip({ id: e.condition, name: e.name }));
+    }
+    dismiss(overlay("toast", e.text), step * 1.2); return step * 0.8;
+  }
+  if (k === "win" || k === "tie") { dismiss(overlay("banner", e.text), step * 2); return step * 1.5; }
+  if (e.target || e.actor) { pop(slotEl(e.target || e.actor), e.text.replace(/^相手の/, ""), ""); return step * 0.6; }
+  return step * 0.4;
+}
+
+async function replay(entries) {
+  const step = reduced.matches || speed === "instant" ? 0 : SPEEDS.find((s) => s[0] === speed)[2];
+  if (!step || !$("#arena")) { appendLog(entries); return; }
+  playing = true; skipping = false;
+  const st = $("#replaystat"); if (st) st.textContent = "再生中（クリック・Space で飛ばす）";
+  for (const e of entries) {
+    appendLog([e]);
+    if (skipping) continue;
+    const ms = await show(e, step);
+    await sleep(ms);
+  }
+  playing = false; skipping = false;
+}
+
+// ---- log (follows the replay, one block per turn) ----
+function logClass(e) {
+  const l = e.text;
+  return e.kind === "faint" ? "ev-faint" : /ばつぐん|急所/.test(l) ? "ev-good" : l.startsWith("相手") ? "ev-foe" : "";
+}
+function appendLog(entries) {
+  const el = $("#log"), atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  el.querySelectorAll(".now").forEach((x) => x.classList.remove("now"));
+  for (const e of entries) {
+    const d = document.createElement("div");
+    if (e.kind === "turn") { d.className = "tblock turn"; d.textContent = e.text.replace(/─/g, "").trim(); }
+    else { d.className = logClass(e) + (entries.length === 1 ? " now" : ""); d.textContent = e.text; }
+    el.appendChild(d);
+  }
+  if (atEnd) el.scrollTop = el.scrollHeight;
+}
+
+// ---- choosing ----
+// 046: what the latest AI would choose for you (for practice; off until asked)
+let showAdvice = (() => { try { return localStorage.getItem("advice") === "1"; } catch (e) { return false; } })();
+function setAdvice(on) { showAdvice = on; try { localStorage.setItem("advice", on ? "1" : "0"); } catch (e) {} }
+function adviceBar(text, on) {
+  const who = state && state.advisor ? state.advisor : "最新の AI";
+  const toggle = `<label class="advtoggle"><input type="checkbox" data-advice ${on ? "checked" : ""}> ${esc(who)} のおすすめを見る</label>`;
+  if (!on) return `<div style="margin-top:8px">${toggle}</div>`;
+  return `<div class="advice">${toggle}<span style="display:inline-flex;gap:4px 14px;flex-wrap:wrap">${text || '<span class="meta">（おすすめを出せなかった）</span>'}</span><button type="button" class="opt" id="useadvice" style="display:inline-block;width:auto;margin-left:auto">おすすめを選ぶ</button></div>`;
+}
+function wireAdvice(rerender, apply) {
+  const t = document.querySelector("[data-advice]"); if (t) t.onchange = (e) => { setAdvice(e.target.checked); rerender(); };
+  const u = $("#useadvice"); if (u) { if (apply) u.onclick = apply; else u.remove(); }
+}
+function renderPreview(s) {
+  const b = s.board;
+  if (!draft) draft = [];
+  const mine = b.team.map((m) => `<div class="mon small pick ${draft.includes(m.index) ? "sel" : ""}" data-i="${m.index}" tabindex="0" role="button">${pic(m)}<div class="info"><div class="name">${esc(m.name)}${draft.includes(m.index) ? `<span class="num">${draft.indexOf(m.index) + 1}</span>` : ""}</div><div class="meta">${esc(m.item)}</div><div class="meta">テラ ${esc(m.tera_type)}</div></div></div>`).join("");
+  const foe = b.foe_preview.map((m) => `<div class="mon small">${pic(m)}<div class="info"><div class="name">${esc(m.name)}</div><div>${typeBadges(m)}</div></div></div>`).join("");
+  const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
+  const name = (i) => (b.team.find((m) => m.index === i) || {}).name || "?";
+  const advRow = adviceBar(adv ? adv.map((i, n) => `${n + 1}. ${esc(name(i))}`).join("　") : "", !!adv);
+  $("#left").innerHTML = `<div class="card"><h2>相手のチーム（${esc(s.ai_label)}）</h2><div class="row">${foe}</div></div>
+    <div class="card" style="margin-top:10px"><h2>あなたの選出（4体を順に選ぶ。1・2番目が先発）</h2><div class="row">${mine}</div>
+    ${advRow}
+    <p><button id="go" ${draft.length === 4 ? "" : "disabled"}>決定</button> <button id="clr" class="opt" style="display:inline-block;width:auto">選び直す</button></p></div>`;
+  if (adv) adv.forEach((i, n) => { const el = document.querySelector(`.pick[data-i="${i}"] .name`); if (el) { el.closest(".pick").classList.add("rec"); el.insertAdjacentHTML("beforeend", `<span class="recmark">おすすめ ${n + 1}</span>`); } });
+  wireAdvice(() => renderPreview(s), adv && (() => { draft = adv.slice(); renderPreview(s); }));
+  document.querySelectorAll(".pick").forEach((el) => {
+    el.onclick = () => {
+      const i = +el.dataset.i; const k = draft.indexOf(i);
+      if (k >= 0) draft.splice(k, 1); else if (draft.length < 4) draft.push(i);
+      renderPreview(s);
+    };
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.onclick(); } };
+  });
+  $("#clr").onclick = () => { draft = []; renderPreview(s); };
+  $("#go").onclick = () => send(draft);
+}
+
+const EFF = (x) => x === null || x === undefined || x === 1 ? "" : x === 0 ? `<span class="eff x0">×0</span>`
+  : x >= 4 ? `<span class="eff x4">×4</span>` : x >= 2 ? `<span class="eff x2">×2</span>` : x <= 0.25 ? `<span class="eff xq">×¼</span>` : `<span class="eff xh">×½</span>`;
+
+function renderTurn(s) {
+  const b = s.board;
+  const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
+  const isRec = (pos, k) => !!(adv && adv[pos] && adv[pos][0] === k);
+  const recTera = (pos) => !!(adv && adv[pos] && adv[pos][1]);
+  if (!draft) draft = s.options.map((o) => ({ k: o.length ? null : -1, tera: false }));
+  const anyTera = draft.some((d) => d.tera);
+  const takenSwitch = (pos, idx) => draft.some((d, p) => p !== pos && d.k !== null && d.k >= 0 && !s.options[p][d.k].move && s.options[p][d.k].index === idx);
+  const cols = s.options.map((opts, pos) => {
+    if (!opts.length) return "";
+    const user = b.team.find((m) => m.position === pos && !m.fainted);
+    const teraBox = s.tera[pos] ? `<label class="meta"><input type="checkbox" data-tera="${pos}" ${draft[pos].tera ? "checked" : ""} ${anyTera && !draft[pos].tera ? "disabled" : ""}> テラスタルする（${esc(user.tera_type)}）</label>` : "";
+    const groups = new Map();
+    opts.forEach((o, k) => { if (o.move) { if (!groups.has(o.index)) groups.set(o.index, []); groups.get(o.index).push([o, k]); } });
+    let n = 0;
+    const moveCards = [...groups.entries()].map(([mi, list]) => {
+      n += 1;
+      const info = mi >= 0 && user && user.moves[mi] ? user.moves[mi] : { name: list[0][0].label, color: "#888" };
+      const eff = (s.matchups && s.matchups[pos] && s.matchups[pos][mi]) || [];
+      const sel = list.some(([, k]) => draft[pos].k === k);
+      const spread = list.length === 1 && !list[0][0].slot ? eff.map((x, i) => x === null ? "" : `<span class="meta">${i ? "右" : "左"}</span>${EFF(x) || '<span class="eff x1">×1</span>'}`).join(" ") : "";
+      const meta = info.type ? `<span class="type" style="background:${info.color}">${esc(info.type)}</span><span class="meta">${esc(info.category)}　威力 ${info.power ?? "—"}　命中 ${info.accuracy === true ? "—" : info.accuracy ?? "—"}　PP ${info.pp}/${info.max_pp}</span>` : "";
+      const tg = list.map(([o, k]) => {
+        const fi = o.slot && o.slot.startsWith("foe") ? +o.slot.slice(3) : -1;
+        const r = isRec(pos, k);
+        return `<button type="button" class="tgt ${draft[pos].k === k ? "sel" : ""} ${r ? "rec" : ""}" data-pos="${pos}" data-k="${k}" data-slot="${esc(o.slot || "")}">${esc(o.target || "これにする")}${fi >= 0 ? EFF(eff[fi]) : ""}${r ? `<span class="recmark">おすすめ${recTera(pos) ? "・テラ" : ""}</span>` : ""}</button>`;
+      }).join("");
+      return `<div class="movecard ${sel ? "sel" : ""}" style="--mc:${info.color || "#888"}"><div class="mhead"><span class="mname">${esc(info.name)}</span><span class="key" title="数字キーで選ぶ">${n}</span></div><div>${meta} ${spread}</div><div>${tg}</div></div>`;
+    }).join("");
+    const switches = opts.map((o, k) => [o, k]).filter(([o]) => !o.move).map(([o, k]) => {
+      const m = b.team.find((x) => x.index === o.index);
+      return `<button type="button" class="swcard ${draft[pos].k === k ? "sel" : ""} ${isRec(pos, k) ? "rec" : ""}" data-pos="${pos}" data-k="${k}" ${takenSwitch(pos, o.index) ? "disabled" : ""}>${m ? pic(m) : ""}<span>交代: <b>${esc(m ? m.name : o.label)}</b>　<span class="meta">${m ? "HP " + m.hp + "/" + m.max_hp : ""}</span>${isRec(pos, k) ? '<span class="recmark">おすすめ</span>' : ""}</span></button>`;
+    }).join("");
+    return `<div data-col="${pos}"><h2>${pos === 0 ? "左" : "右"}: ${esc(user ? user.name : "")} の行動</h2>${teraBox}${moveCards}${switches}</div>`;
+  }).join("");
+  const ready = draft.every((d) => d.k !== null);
+  const summary = s.options.map((opts, pos) => {
+    if (!opts.length) return "";
+    const d = draft[pos];
+    const label = d.k === null ? `<span class="todo">まだ選んでいない</span>` : `<b>${esc(opts[d.k].label)}</b>${d.tera ? "（テラスタル）" : ""}`;
+    return `<span>${pos === 0 ? "左" : "右"}: ${label}</span>`;
+  }).join("");
+  const advText = adv ? s.options.map((opts, pos) => {
+    const a = adv[pos]; if (!opts.length || !a || a[0] === null) return "";
+    return `<span>${pos === 0 ? "左" : "右"}: <b>${esc(opts[a[0]].label)}</b>${a[1] ? "（テラスタル）" : ""}</span>`;
+  }).join("") : "";
+  $("#left").innerHTML = arenaHtml(b) + `<div class="card" style="margin-top:10px"><div class="cols">${cols}</div>
+    ${adviceBar(advText, !!adv)}
+    <div class="summary">${summary}<button id="go" style="margin-left:auto" ${ready ? "" : "disabled"}>決定（Enter）</button></div></div>`;
+  wireArena();
+  wireAdvice(() => renderTurn(s), adv && (() => {
+    draft = s.options.map((opts, pos) => ({ k: opts.length ? (adv[pos] && adv[pos][0] !== null ? adv[pos][0] : null) : -1, tera: !!(adv[pos] && adv[pos][1]) }));
+    renderTurn(s); }));
+  document.querySelectorAll("#left [data-k]").forEach((el) => {
+    el.onclick = () => { draft[+el.dataset.pos].k = +el.dataset.k; renderTurn(s); };
+    const tgt = el.dataset.slot;
+    if (tgt) {
+      el.onmouseenter = el.onfocus = () => { const x = slotEl(tgt); x && x.classList.add("targeted"); };
+      el.onmouseleave = el.onblur = () => { const x = slotEl(tgt); x && x.classList.remove("targeted"); };
+    }
+  });
+  document.querySelectorAll("[data-tera]").forEach((el) => el.onchange = () => { draft[+el.dataset.tera].tera = el.checked; renderTurn(s); });
+  $("#go").onclick = () => send(draft.map((d) => [d.k < 0 ? null : d.k, d.tera]));
+  keyHandler = (e) => {
+    if (e.target.matches("input, select, textarea") || playing) return;
+    if (e.key === "Enter" && ready) { e.preventDefault(); $("#go").click(); return; }
+    const n = +e.key; if (!(n >= 1 && n <= 4)) return;
+    const pos = draft.findIndex((d) => d.k === null); if (pos < 0) return;
+    const col = document.querySelector(`[data-col="${pos}"]`); const card = col && col.querySelectorAll(".movecard")[n - 1];
+    const first = card && card.querySelector(".tgt"); if (!first) return;
+    if (card.querySelectorAll(".tgt").length === 1) first.click(); else first.focus();
+  };
+}
+let keyHandler = null;
+document.addEventListener("keydown", (e) => { if (keyHandler && state && state.phase === "turn") keyHandler(e); });
+
+function renderReplace(s) {
+  const b = s.board;
+  const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
+  const bench = b.team.filter((m) => b.brought.includes(m.index) && m.position === null && !m.fainted);
+  if (!draft) draft = s.need.map(() => null);
+  const cols = s.need.map((need, pos) => !need ? "" : `<div><h2>${pos === 0 ? "左" : "右"}に繰り出す</h2>${bench.map((m) => {
+    const taken = draft.some((d, p) => p !== pos && d === m.index);
+    const r = adv && adv[pos] === m.index;
+    return `<button type="button" class="swcard ${draft[pos] === m.index ? "sel" : ""} ${r ? "rec" : ""}" data-pos="${pos}" data-i="${m.index}" ${taken ? "disabled" : ""}>${pic(m)}<span><b>${esc(m.name)}</b> ${typeBadges(m)}　<span class="meta">HP ${m.hp}/${m.max_hp}</span>${r ? '<span class="recmark">おすすめ</span>' : ""}</span></button>`;
+  }).join("")}</div>`).join("");
+  const ready = s.need.every((need, pos) => !need || draft[pos] !== null || bench.length <= draft.filter((d) => d !== null).length);
+  const advText = adv ? s.need.map((need, pos) => need && adv[pos] !== null ? `<span>${pos === 0 ? "左" : "右"}: <b>${esc((b.team.find((m) => m.index === adv[pos]) || {}).name || "")}</b></span>` : "").join("") : "";
+  $("#left").innerHTML = arenaHtml(b) + `<div class="card" style="margin-top:10px"><div class="cols">${cols}</div>${adviceBar(advText, !!adv)}<p><button id="go" ${ready ? "" : "disabled"}>決定</button></p></div>`;
+  wireArena();
+  wireAdvice(() => renderReplace(s), adv && (() => { draft = adv.slice(); renderReplace(s); }));
+  document.querySelectorAll("button.swcard").forEach((el) => el.onclick = () => { draft[+el.dataset.pos] = +el.dataset.i; renderReplace(s); });
+  $("#go").onclick = () => send(draft);
+}
+
+function renderOver(s) {
+  const word = { win: "あなたの勝ち！", lose: "あなたの負け…", tie: "引き分け" }[s.outcome];
+  $("#left").innerHTML = (s.board ? arenaHtml(s.board) : "") + `<div class="card" style="margin-top:10px"><h2>結果</h2>
+    <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em">${word}（${s.turns} ターン）</p>
+    <details><summary>相手の AI（${esc(s.ai_label)}）が選んだ行動</summary><div class="log" style="height:auto;max-height:400px">${s.ai_log.map(esc).join("\n")}</div></details>
+    <p><button id="again">新しい対戦</button></p></div>`;
+  wireArena();
+  $("#again").onclick = () => renderSetup();
+}
+
+function renderWaiting() {
+  $("#left").innerHTML = (lastBoard ? arenaHtml(lastBoard) : "") + thinkingHtml();
+  tickThinking();
+  wireArena();
+}
+
+let thinkingSince = 0, thinkTimer = null;
+function thinkingHtml() {
+  if (!thinkingSince) thinkingSince = Date.now();
+  const who = state && state.ai_label ? `相手（${esc(state.ai_label)}）` : "相手";
+  return `<div class="card thinking" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>${who}が考えています…</span><span class="meta" id="thinksec"></span></div>`;
+}
+function tickThinking() {
+  clearInterval(thinkTimer);
+  thinkTimer = setInterval(() => {
+    const el = $("#thinksec"); if (!el) { clearInterval(thinkTimer); thinkingSince = 0; return; }
+    const sec = Math.floor((Date.now() - thinkingSince) / 1000); el.textContent = sec >= 2 ? `${sec} 秒` : "";
+  }, 500);
+}
+async function send(answer) {
+  $("#left").querySelectorAll("button").forEach((b) => b.disabled = true);
+  keyHandler = null;
+  thinkingSince = 0;
+  $("#left").insertAdjacentHTML("beforeend", thinkingHtml());  // at once, before the server answers
+  tickThinking();
+  await api("/api/choose", { answer });
+  draft = null; lastKey = ""; poll();
+}
+
+let timer = null, busy = false;
+async function poll() {
+  clearTimeout(timer);
+  if (busy) { timer = setTimeout(poll, 100); return; }
+  busy = true;
+  try {
+    const s = await api("/api/state");
+    const feed = s.feed || [];
+    if (shown < 0 || feed.length < shown) {  // the page just opened, or a new battle: no replay
+      $("#log").innerHTML = ""; appendLog(feed); shown = feed.length;
+    }
+    state = s;
+    document.body.classList.toggle("setup", s.phase === "setup");
+    const fresh = feed.slice(shown);
+    if (s.phase !== "waiting") document.querySelectorAll("#left .thinking").forEach((x) => x.remove());  // the AI has chosen
+    if (fresh.length && s.phase !== "waiting") { shown = feed.length; await replay(fresh); }
+    const key = s.phase + ":" + (s.board ? s.board.turn : "") + ":" + feed.length;
+    if (key !== lastKey) {
+      lastKey = key;
+      if (s.phase === "setup") renderSetup();
+      else if (s.phase === "preview") renderPreview(s);
+      else if (s.phase === "turn") renderTurn(s);
+      else if (s.phase === "replace") renderReplace(s);
+      else if (s.phase === "over") renderOver(s);
+      else if (s.phase === "error") $("#left").innerHTML = `<div class="card"><h2>エラー</h2><div class="err">${esc(s.error)}</div></div>`;
+      else if (s.phase === "waiting") renderWaiting();
+    }
+    if (s.phase === "waiting") timer = setTimeout(poll, 100);
+  } finally { busy = false; }
+}
+
+$("#newbtn").onclick = () => { if (options) renderSetup(); };
+(async () => {
+  let phone;
+  [options, catalog, phone] = await Promise.all([api("/api/options"), api("/api/catalog"), api("/api/phone")]);
+  phoneUrl = phone.url || "";
+  await Promise.all([...builds.mine, ...builds.foe].filter((m) => m.species).map((m) => detail(m.species)));
+  poll();
+})();
+</script>
+</body>
+</html>

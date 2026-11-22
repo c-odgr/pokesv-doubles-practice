@@ -231,7 +231,21 @@ small.note { color:var(--sub); font-size:11px; }
 .log .ev-foe { color:var(--sub); }
 .log .tblock { border-top:1px solid var(--line); margin-top:6px; padding-top:4px; }
 .log .now { background:color-mix(in oklab, var(--accent) 14%, transparent); border-radius:4px; }
-@media (max-width: 960px) { .log { height:260px; } }
+/* 依頼者 2026-11-23 ②: on a narrow screen the log is a drawer at the right edge, opened and
+   closed with its tab (always there during a battle) instead of a long scroll down */
+.logtab { display:none; }
+@media (max-width: 960px) {
+  body:not(.setup) .logdrawer { position:fixed; top:0; right:0; bottom:0; z-index:40; width:min(86vw, 380px); margin:0;
+    border-radius:14px 0 0 14px; display:flex; flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.18);
+    transform:translateX(100%); visibility:hidden; transition: transform 220ms cubic-bezier(0.23,1,0.32,1), visibility 0s 220ms; }
+  body.logopen:not(.setup) .logdrawer { transform:none; visibility:visible; transition: transform 240ms cubic-bezier(0.23,1,0.32,1); }
+  body:not(.setup) .logdrawer .log { height:auto; flex:1; min-height:0; }
+  body:not(.setup) .logtab { display:flex; position:fixed; right:0; top:50%; z-index:41; transform:translateY(-50%);
+    writing-mode:vertical-rl; padding:14px 8px; min-height:0; border-radius:10px 0 0 10px; font-weight:700; letter-spacing:.1em;
+    box-shadow:-2px 2px 8px rgba(0,0,0,.2); transition: right 240ms cubic-bezier(0.23,1,0.32,1); }
+  body.logopen:not(.setup) .logtab { right:min(86vw, 380px); }
+  body.setup .log { height:260px; }
+}
 
 /* 045: fingers on a phone: 44px targets, no double-tap zoom on buttons */
 @media (pointer: coarse) {
@@ -258,7 +272,8 @@ small.note { color:var(--sub); font-size:11px; }
 </header>
 <main>
   <section id="left"></section>
-  <aside class="card"><h2>ログ</h2><div class="log" id="log" aria-live="polite"></div></aside>
+  <aside class="card logdrawer" id="logdrawer"><h2>ログ</h2><div class="log" id="log" aria-live="polite"></div></aside>
+  <button type="button" class="logtab" id="logtab" aria-controls="logdrawer" aria-expanded="false">ログ</button>
 </main>
 <script>
 "use strict";
@@ -739,6 +754,12 @@ function renderTurn(s) {
   const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
   const isRec = (pos, k) => !!(adv && adv[pos] && adv[pos][0] === k);
   const recTera = (pos) => !!(adv && adv[pos] && adv[pos][1]);
+  // ④: 「〜タイプにテラスタルして、技」 (not 「技（テラスタル）」)
+  const teraWords = (pos, label, tera) => {
+    if (!tera) return `<b>${esc(label)}</b>`;
+    const u = b.team.find((m) => m.position === pos && !m.fainted);
+    return `${esc(u ? u.tera_type : "")}タイプにテラスタルして、<b>${esc(label)}</b>`;
+  };
   if (!draft) draft = s.options.map((o) => ({ k: o.length ? null : -1, tera: false }));
   const anyTera = draft.some((d) => d.tera);
   const takenSwitch = (pos, idx) => draft.some((d, p) => p !== pos && d.k !== null && d.k >= 0 && !s.options[p][d.k].move && s.options[p][d.k].index === idx);
@@ -773,12 +794,12 @@ function renderTurn(s) {
   const summary = s.options.map((opts, pos) => {
     if (!opts.length) return "";
     const d = draft[pos];
-    const label = d.k === null ? `<span class="todo">まだ選んでいない</span>` : `<b>${esc(opts[d.k].label)}</b>${d.tera ? "（テラスタル）" : ""}`;
+    const label = d.k === null ? `<span class="todo">まだ選んでいない</span>` : teraWords(pos, opts[d.k].label, d.tera);
     return `<span>${pos === 0 ? "左" : "右"}: ${label}</span>`;
   }).join("");
   const advText = adv ? s.options.map((opts, pos) => {
     const a = adv[pos]; if (!opts.length || !a || a[0] === null) return "";
-    return `<span>${pos === 0 ? "左" : "右"}: <b>${esc(opts[a[0]].label)}</b>${a[1] ? "（テラスタル）" : ""}</span>`;
+    return `<span>${pos === 0 ? "左" : "右"}: ${teraWords(pos, opts[a[0]].label, a[1])}</span>`;
   }).join("") : "";
   $("#left").innerHTML = arenaHtml(b) + `<div class="card" style="margin-top:10px"><div class="cols">${cols}</div>
     ${adviceBar(advText, !!adv)}
@@ -858,7 +879,19 @@ function tickThinking() {
     const sec = Math.floor((Date.now() - thinkingSince) / 1000); el.textContent = sec >= 2 ? `${sec} 秒` : "";
   }, 500);
 }
+// ③: after choosing, a phone shows the battle (the top of the page) for the turn's replay
+function toBattle() {
+  if (!matchMedia("(max-width: 960px)").matches) return;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+}
+$("#logtab").onclick = () => {
+  const open = document.body.classList.toggle("logopen");
+  $("#logtab").setAttribute("aria-expanded", String(open));
+  if (open) { const el = $("#log"); el.scrollTop = el.scrollHeight; }
+};
 async function send(answer) {
+  toBattle();
   $("#left").querySelectorAll("button").forEach((b) => b.disabled = true);
   keyHandler = null;
   thinkingSince = 0;

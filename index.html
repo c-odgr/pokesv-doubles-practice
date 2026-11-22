@@ -130,7 +130,10 @@ small.note { color:var(--sub); font-size:11px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: pulse 1.2s ease-in-out infinite !important; animation-duration:1.2s !important; animation-iteration-count: infinite !important; } }
 @keyframes pulse { 50% { opacity:.35; } }
-.advtoggle { font-size:12px; color:var(--sub); display:inline-flex; gap:6px; align-items:center; }
+.advtoggle { font-size:14px; color:var(--ink); display:inline-flex; gap:10px; align-items:center; cursor:pointer; min-height:44px; }
+.advtoggle input { width:22px; height:22px; flex:none; accent-color:var(--accent); margin:0; cursor:pointer; }
+.optbox { border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:12px 0; }
+.optbox h3 { font-size:14px; margin:0 0 4px; }
 .slots { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:6px 10px 10px; }
 .slots.foe { padding-left:22%; }
 .slots.me { padding-right:22%; }
@@ -324,8 +327,9 @@ function renderSetup(msg) {
     <datalist id="dl-species">${catalog.species.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
     <datalist id="dl-items">${catalog.items.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
     <div class="cols">${side("mine", "あなたのチーム")}${side("foe", "相手のチーム")}</div>
-    <p>相手の AI: <select id="ai">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span></p>
-    <p><label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}> 最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する（学習用。対戦中にも切り替えられる）</label></p>
+    <p>相手の AI: <select id="ai">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span><br><span class="meta">※ m の番号が新しいほど強い傾向にあります。</span></p>
+    <div class="optbox"><h3>オプション設定</h3>
+    <label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}><span>自分の手番に、最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する<br><span class="meta">学習用。対戦中にも切り替えられます</span></span></label></div>
     <button id="start">対戦を始める</button> <span class="err" id="err">${esc(msg || "")}</span>
     ${phoneUrl ? `<p class="phone">スマホで開く（同じ Wi-Fi）: <code>${esc(phoneUrl)}</code><br>鍵つきの URL です。他の人に見せないでください。</p>` : ""}
     <p><small class="note">ポケモンの画像は同梱していません。遊ぶときにブラウザが PokeAPI/sprites から読み込みます（著作権は任天堂・クリーチャーズ・ゲームフリークにあります）。読み込めないときはタイプの色で表示します。</small></p></div>`;

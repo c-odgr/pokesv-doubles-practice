@@ -130,6 +130,7 @@ small.note { color:var(--sub); font-size:11px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: pulse 1.2s ease-in-out infinite !important; animation-duration:1.2s !important; animation-iteration-count: infinite !important; } }
 @keyframes pulse { 50% { opacity:.35; } }
+.ver { font-size:12px; font-weight:600; color:var(--sub); margin-left:4px; }
 .advtoggle { font-size:14px; color:var(--ink); display:inline-flex; gap:10px; align-items:center; cursor:pointer; min-height:44px; }
 .advtoggle input { width:22px; height:22px; flex:none; accent-color:var(--accent); margin:0; cursor:pointer; }
 .optbox { border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:12px 0; }
@@ -251,7 +252,7 @@ small.note { color:var(--sub); font-size:11px; }
 <div id="boot" class="card thinking" role="status" aria-live="polite" style="position:fixed;left:50%;top:40%;transform:translateX(-50%);z-index:50;max-width:calc(100vw - 32px)"><span class="spinner" aria-hidden="true"></span><span>準備しています…</span></div>
 
 <header>
-  <h1>ダブルバトル練習</h1>
+  <h1>ポケモンSVダブルバトルシミュレータ <span class="ver" id="ver"></span></h1>
   <label><input type="checkbox" id="sil"> シルエット表示</label>
   <button id="newbtn" style="margin-left:auto">新しい対戦</button>
 </header>
@@ -903,6 +904,7 @@ $("#newbtn").onclick = () => { if (options) renderSetup(); };
   let phone;
   [options, catalog, phone] = await Promise.all([api("/api/options"), api("/api/catalog"), api("/api/phone")]);
   phoneUrl = phone.url || "";
+  if (options.version) $("#ver").textContent = "v" + options.version;
   await Promise.all([...builds.mine, ...builds.foe].filter((m) => m.species).map((m) => detail(m.species)));
   poll();
 })();

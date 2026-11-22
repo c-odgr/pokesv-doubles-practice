@@ -19,7 +19,7 @@
   --bg:#f4f5f8; --card:#fff; --ink:#1d2330; --sub:#4b5563; --line:#d8dce3;
   --accent:#2f6fde; --me:#2f6fde; --foe:#d2483a;
   --hp:#3bb55a; --mid:#e0b020; --low:#e04a3a;
-  --up:#2f7de1; --down:#e0483a;
+  --up:#d0392d; --down:#2f6fd1;  /* 依頼者 2026-11-23: raised = red, lowered = blue (white text) */
   --arena-sky:#e9f0fb; --arena-ground:#dfe9d8;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -30,7 +30,7 @@
     color-scheme: dark;
     --field:#0f1217; --field-ink:#f3f5f9; --field-line:#5b6576; --ph:#9aa3b5;
     --bg:#121519; --card:#1c2129; --ink:#eef1f6; --sub:#b4bccb; --line:#363e4b;
-    --accent:#7aa5ff; --me:#7aa5ff; --foe:#ff7b6b; --up:#6fa8ff; --down:#ff6f61;
+    --accent:#7aa5ff; --me:#7aa5ff; --foe:#ff7b6b; --up:#d0392d; --down:#2f6fd1;
     --arena-sky:#1a2232; --arena-ground:#1d2a22;
   }
 }
@@ -135,6 +135,12 @@ small.note { color:var(--sub); font-size:11px; }
 .advtoggle input { width:22px; height:22px; flex:none; accent-color:var(--accent); margin:0; cursor:pointer; }
 .optbox { border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin:12px 0; }
 .optbox h3 { font-size:14px; margin:0 0 4px; }
+/* 依頼者 2026-11-23: the setup screen in clearly separate blocks (each a tinted box with a heading line) */
+.sec { --tint:var(--sub); border:1px solid color-mix(in oklab, var(--tint) 35%, var(--line)); border-left:5px solid var(--tint); border-radius:12px;
+  padding:12px; margin:12px 0; background:color-mix(in oklab, var(--tint) 6%, var(--card)); min-width:0; }
+.cols > .sec { margin:0; }
+.sec > h2 { color:var(--ink); font-size:15px; padding-bottom:6px; margin-bottom:10px; border-bottom:1px solid color-mix(in oklab, var(--tint) 40%, var(--line)); }
+.sec.mine { --tint:var(--me); } .sec.foe { --tint:var(--foe); } .sec.ai { --tint:#8a63d2; } .sec.opt { --tint:#2a9d4b; }
 .slots { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:6px 10px 10px; }
 .slots.foe { padding-left:22%; }
 .slots.me { padding-right:22%; }
@@ -235,17 +241,38 @@ small.note { color:var(--sub); font-size:11px; }
 .log .now { background:color-mix(in oklab, var(--accent) 14%, transparent); border-radius:4px; }
 /* 依頼者 2026-11-23 ②: on a narrow screen the log is a drawer at the right edge, opened and
    closed with its tab (always there during a battle) instead of a long scroll down */
-.logtab { display:none; }
+.logtab, .foetab, #foebtn { display:none; }
+/* 依頼者 2026-11-23: the foe's team sheet (the six at team preview) */
+.sidetabs { display:contents; }
+body:not(.setup) #foebtn { display:inline-flex; }
+dialog.sheet { border:1px solid var(--line); border-radius:14px; background:var(--card); color:var(--ink); padding:14px; width:min(560px, calc(100vw - 32px)); max-height:min(86vh, 720px); }
+dialog.sheet::backdrop { background:rgba(0,0,0,.45); }
+dialog.sheet[open] { animation: sheetin 200ms var(--ease-out); }
+@keyframes sheetin { from { opacity:0; transform:translateY(8px); } }
+.sheethead { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.sheethead h2 { margin:0; color:var(--ink); font-size:16px; }
+.sheethead button { min-height:44px; min-width:44px; }
+.foelist { display:grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap:8px; }
+.foelist .mon { align-items:center; }
+.foelist .mon.fainted .pic { filter: grayscale(1); }
+.mark { display:inline-block; font-size:11px; font-weight:800; border-radius:5px; padding:1px 6px; margin-top:3px; }
+.mark.in { background:var(--accent); color:var(--card); }
+.mark.out { background:var(--sub); color:var(--card); }
+.mark.unk { border:1px solid var(--line); color:var(--sub); }
 @media (max-width: 960px) {
   body:not(.setup) .logdrawer { position:fixed; top:0; right:0; bottom:0; z-index:40; width:min(86vw, 380px); margin:0;
     border-radius:14px 0 0 14px; display:flex; flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,.18);
     transform:translateX(100%); visibility:hidden; transition: transform 220ms cubic-bezier(0.23,1,0.32,1), visibility 0s 220ms; }
   body.logopen:not(.setup) .logdrawer { transform:none; visibility:visible; transition: transform 240ms cubic-bezier(0.23,1,0.32,1); }
   body:not(.setup) .logdrawer .log { height:auto; flex:1; min-height:0; }
-  body:not(.setup) .logtab { display:flex; position:fixed; right:0; top:50%; z-index:41; transform:translateY(-50%);
+  body:not(.setup) .sidetabs { display:flex; flex-direction:column; align-items:flex-end; gap:8px; position:fixed; right:0; top:50%; z-index:41;
+    transform:translateY(-50%); transition: right 240ms cubic-bezier(0.23,1,0.32,1); }
+  body:not(.setup) .logtab, body:not(.setup) .foetab { display:flex; justify-content:center; min-width:44px;
     writing-mode:vertical-rl; padding:14px 8px; min-height:0; border-radius:10px 0 0 10px; font-weight:700; letter-spacing:.1em;
-    box-shadow:-2px 2px 8px rgba(0,0,0,.2); transition: right 240ms cubic-bezier(0.23,1,0.32,1); }
-  body.logopen:not(.setup) .logtab { right:min(86vw, 380px); }
+    box-shadow:-2px 2px 8px rgba(0,0,0,.2); }
+  body:not(.setup) .foetab { background:#b8392c; }
+  body.logopen:not(.setup) .sidetabs { right:min(86vw, 380px); }
+  body:not(.setup) #foebtn { display:none; }
   body.setup .log { height:260px; }
 }
 
@@ -270,12 +297,18 @@ small.note { color:var(--sub); font-size:11px; }
 <header>
   <h1>ポケモンSVダブルバトルシミュレータ <span class="ver" id="ver"></span></h1>
   <label><input type="checkbox" id="sil"> シルエット表示</label>
-  <button id="newbtn" style="margin-left:auto">新しい対戦</button>
+  <span style="margin-left:auto"></span>
+  <button type="button" id="foebtn" aria-haspopup="dialog" aria-controls="foesheet">相手のチーム</button>
+  <button id="newbtn">新しい対戦</button>
 </header>
 <main>
   <section id="left"></section>
   <aside class="card logdrawer" id="logdrawer"><h2>ログ</h2><div class="log" id="log" aria-live="polite"></div></aside>
-  <button type="button" class="logtab" id="logtab" aria-controls="logdrawer" aria-expanded="false">ログ</button>
+  <div class="sidetabs">
+    <button type="button" class="foetab" id="foetab" aria-haspopup="dialog" aria-controls="foesheet">相手</button>
+    <button type="button" class="logtab" id="logtab" aria-controls="logdrawer" aria-expanded="false">ログ</button>
+  </div>
+  <dialog class="sheet" id="foesheet" aria-labelledby="foesheettitle"><div class="sheethead"><h2 id="foesheettitle">相手のチーム</h2><button type="button" id="foesheetclose" aria-label="閉じる">×</button></div><div id="foesheetbody"></div></dialog>
 </main>
 <script>
 "use strict";
@@ -336,7 +369,7 @@ function renderSetup(msg) {
   document.body.classList.add("setup");
   const ais = options.ais.map((a) => `<option value="${a.id}" ${a.id === options.default ? "selected" : ""}>${esc(a.label)}</option>`).join("");
   const teams = options.teams.map((t) => `<option value="${esc(t.id)}">${esc(t.id)}　${esc(t.names)}</option>`).join("");
-  const side = (k, title) => `<div><h2>${title}</h2>
+  const side = (k, title) => `<div class="sec ${k}"><h2>${title}</h2>
     <select id="${k}mode"><option value="build">自分で組む</option><option value="regf">大会のチーム</option><option value="text">テキストを貼る</option></select>
     <div id="${k}build"></div>
     <select id="${k}sel" style="width:100%;display:none">${teams}</select>
@@ -345,8 +378,8 @@ function renderSetup(msg) {
     <datalist id="dl-species">${catalog.species.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
     <datalist id="dl-items">${catalog.items.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
     <div class="cols">${side("mine", "あなたのチーム")}${side("foe", "相手のチーム")}</div>
-    <p>相手の AI: <select id="ai">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span><br><span class="meta">※ m の番号が新しいほど強い傾向にあります。</span></p>
-    <div class="optbox"><h3>オプション設定</h3>
+    <div class="sec ai"><h2>相手の AI</h2><p style="margin:0"><select id="ai" aria-label="相手の AI">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span><br><span class="meta">※ m の番号が新しいほど強い傾向にあります。</span></p></div>
+    <div class="sec opt"><h2>オプション設定</h2>
     <label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}><span>自分の手番に、最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する<br><span class="meta">学習用。対戦中にも切り替えられます</span></span></label></div>
     <button id="start">対戦を始める</button> <span class="err" id="err">${esc(msg || "")}</span>
     ${phoneUrl ? `<p class="phone">スマホで開く（同じ Wi-Fi）: <code>${esc(phoneUrl)}</code><br>鍵つきの URL です。他の人に見せないでください。</p>` : ""}
@@ -887,6 +920,23 @@ function toBattle() {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
 }
+// 依頼者 2026-11-23: the foe's six from team preview: sent out (選出確定), fainted, or unknown
+function foeSheetHtml(b) {
+  if (!b || !b.foe_preview || !b.foe_preview.length) return `<p class="meta">対戦が始まると表示します。</p>`;
+  const seen = new Set(b.foe_seen || []), down = new Set(b.foe_fainted || []);
+  const items = b.foe_preview.map((m, i) => {
+    const mark = down.has(i) ? `<span class="mark out">選出確定・ひんし</span>` : seen.has(i) ? `<span class="mark in">選出確定</span>` : `<span class="mark unk">不明</span>`;
+    return `<div class="mon small ${down.has(i) ? "fainted" : ""}">${pic(m)}<div class="info"><div class="name">${esc(m.name)}</div><div>${typeBadges(m)}</div>${mark}</div></div>`;
+  }).join("");
+  return `<p class="meta" style="margin:0 0 8px">選出確定 ${seen.size}／4・ひんし ${down.size}</p><div class="foelist">${items}</div>`;
+}
+function openFoeSheet() {
+  $("#foesheetbody").innerHTML = foeSheetHtml(state && state.board);
+  const d = $("#foesheet"); if (!d.open) d.showModal();
+}
+$("#foetab").onclick = openFoeSheet; $("#foebtn").onclick = openFoeSheet;
+$("#foesheetclose").onclick = () => $("#foesheet").close();
+$("#foesheet").onclick = (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); };
 $("#logtab").onclick = () => {
   const open = document.body.classList.toggle("logopen");
   $("#logtab").setAttribute("aria-expanded", String(open));

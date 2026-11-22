@@ -1,8 +1,8 @@
 // 047: keeps the app, Pyodide and the sprites seen so far, so the page opens without a network.
-const VERSION = "4eddb70b6471";
-const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+const VERSION = "ac4884683a8d";
+const PYODIDE = new URL("pyodide/", self.location).href;  // (served with the site)
 const CORE = ["./", "index.html", "worker.js", "pokesv_sim.zip", "manifest.webmanifest", "icon.svg",
-  ...["pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"].map((f) => PYODIDE + f)];
+  ...["pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"].map((f) => "pyodide/" + f)];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -18,7 +18,7 @@ self.addEventListener("fetch", (e) => {
     if (hit) return hit;
     const res = await fetch(e.request);
     const url = e.request.url;
-    if ((res.ok || res.type === "opaque") && (url.startsWith(PYODIDE) || url.includes("/PokeAPI/sprites/"))) c.put(e.request, res.clone());
+    if ((res.ok || res.type === "opaque") && url.includes("/PokeAPI/sprites/")) c.put(e.request, res.clone());
     return res;
   }));
 });

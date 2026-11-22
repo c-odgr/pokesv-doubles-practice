@@ -1,12 +1,13 @@
 // 047: the engine in this worker (Pyodide). The page posts {id, path, body}; the answer is
 // what the PC's server would have sent for the same request.
-const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
-importScripts(PYODIDE + "pyodide.js");
-
+const PYODIDE = new URL("pyodide/", self.location).href;  // (served with the site)
 const say = (text) => postMessage({ id: 0, text });
+const fail = (where, err) => postMessage({ id: 0, error: `${where}: ${String(err && err.message || err).slice(0, 300)}` });
+say("Python を読み込んでいます…（初回は 10MB ほど通信します）");
+try { importScripts(PYODIDE + "pyodide.js"); } catch (err) { fail("Python の読み込みに失敗", err); }
+
 
 const ready = (async () => {
-  say("Python を読み込んでいます…");
   const py = await loadPyodide({ indexURL: PYODIDE });
   say("エンジンを読み込んでいます…");
   const zip = await (await fetch("pokesv_sim.zip")).arrayBuffer();
@@ -28,6 +29,7 @@ def handle(path, body):
   say("");
   return py.globals.get("handle");
 })();
+ready.catch((err) => fail("起動に失敗", err));
 
 onmessage = async (e) => {
   const { id, path, body } = e.data;

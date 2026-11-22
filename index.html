@@ -289,10 +289,20 @@ const waiting = new Map();
 let calls = 0;
 engine.onmessage = (e) => {
   const { id, ok, data, error, text } = e.data;
-  if (id === 0) { const b = document.getElementById("boot"); if (b) { b.hidden = !text; b.querySelector("span").textContent = text; } return; }
+  if (id === 0) { error ? bootError(error) : bootSay(text); return; }
   const w = waiting.get(id); waiting.delete(id);
   if (ok) w[0](data); else w[1](new Error(error));
 };
+// the boot card: progress, then an error with what to try (instead of spinning forever)
+// (removed when ready: the card's display:flex outranks the hidden attribute)
+function bootSay(text) { const b = document.getElementById("boot"); if (!b || b.dataset.err) return; if (!text) b.remove(); else b.querySelector("span:last-child").textContent = text; }
+function bootError(msg) {
+  const b = document.getElementById("boot"); if (!b) return;
+  b.dataset.err = "1"; b.querySelector(".spinner").remove();
+  b.querySelector("span:last-child").innerHTML = `起動できませんでした。<br><small>${esc(msg)}</small><br><small>通信のよい場所で再読み込みしてください。直らないときはこの文を知らせてください。</small>`;
+}
+engine.onerror = (e) => bootError("エンジン: " + (e.message || "読み込めません"));
+setTimeout(() => { const b = document.getElementById("boot"); if (b && !b.dataset.err) bootError("90 秒たっても準備が終わりません（最後の表示: " + b.textContent.trim() + "）"); }, 90000);
 function api(path, body) {
   return new Promise((resolve, reject) => {
     calls += 1; waiting.set(calls, [resolve, reject]);

@@ -324,7 +324,9 @@ applySil();
 
 function pic(m) {
   const bg = m.colors && m.colors.length ? (m.colors.length > 1 ? `linear-gradient(135deg, ${m.colors[0]} 50%, ${m.colors[1]} 50%)` : m.colors[0]) : "#888";
-  const img = m.sprite ? `<img src="${esc(m.sprite)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  // a forme's own image, then the base forme's, then the type colour
+  const fb = m.sprite_base ? ` data-fb="${esc(m.sprite_base)}"` : "";
+  const img = m.sprite ? `<img src="${esc(m.sprite)}"${fb} alt="" loading="lazy" onerror="if(this.dataset.fb){this.src=this.dataset.fb;delete this.dataset.fb}else this.remove()">` : "";
   return `<div class="pic" style="background:${bg}">${esc((m.name || "?")[0])}${img}</div>`;
 }
 const typeBadges = (m) => (m.types_ja || []).map((t, i) => `<span class="type" style="background:${m.colors[i]}">${esc(t)}</span>`).join("");
@@ -763,8 +765,8 @@ function renderPreview(s) {
   const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
   const name = (i) => (b.team.find((m) => m.index === i) || {}).name || "?";
   const advRow = adviceBar(adv ? adv.map((i, n) => `${n + 1}. ${esc(name(i))}`).join("　") : "", !!adv);
-  $("#left").innerHTML = `<div class="card"><h2>相手のチーム（${esc(s.ai_label)}）</h2><div class="row">${foe}</div></div>
-    <div class="card" style="margin-top:10px"><h2>あなたの選出（4体を順に選ぶ。1・2番目が先発）</h2><div class="row">${mine}</div>
+  $("#left").innerHTML = `<div class="card sec foe"><h2>相手のチーム（${esc(s.ai_label)}）</h2><div class="row">${foe}</div></div>
+    <div class="card sec mine"><h2>あなたの選出（4体を順に選ぶ。1・2番目が先発）</h2><div class="row">${mine}</div>
     ${advRow}
     <p><button id="go" ${draft.length === 4 ? "" : "disabled"}>決定</button> <button id="clr" class="opt" style="display:inline-block;width:auto">選び直す</button></p></div>`;
   if (adv) adv.forEach((i, n) => { const el = document.querySelector(`.pick[data-i="${i}"] .name`); if (el) { el.closest(".pick").classList.add("rec"); el.insertAdjacentHTML("beforeend", `<span class="recmark">おすすめ ${n + 1}</span>`); } });

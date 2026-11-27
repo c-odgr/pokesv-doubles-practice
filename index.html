@@ -297,6 +297,7 @@ dialog.sheet[open] { animation: sheetin 200ms var(--ease-out); }
 <header>
   <h1>ポケモンSVダブルバトルシミュレータ <span class="ver" id="ver"></span></h1>
   <label><input type="checkbox" id="sil"> シルエット表示</label>
+  <label><input type="checkbox" id="hidemask"> 相手のオーガポンの面を隠す</label>
   <span style="margin-left:auto"></span>
   <button type="button" id="foebtn" aria-haspopup="dialog" aria-controls="foesheet">相手のチーム</button>
   <button id="newbtn">新しい対戦</button>
@@ -321,6 +322,17 @@ const applySil = () => { document.body.classList.toggle("silhouette", $("#sil").
   document.body.classList.toggle("dark-sil", matchMedia("(prefers-color-scheme: dark)").matches); };
 $("#sil").onchange = () => { applySil(); try { localStorage.setItem("sil", $("#sil").checked ? "1" : "0"); } catch (e) {} };
 applySil();
+// 依頼者 2026-11-26: an option to not see which mask the foe's Ogerpon wears at team preview
+try { if (localStorage.getItem("hidemask") === "1") $("#hidemask").checked = true; } catch (e) {}
+$("#hidemask").onchange = () => { try { localStorage.setItem("hidemask", $("#hidemask").checked ? "1" : "0"); } catch (e) {}
+  lastKey = ""; if (state && state.phase === "preview") { try { renderPreview(state); } catch (e) {} }
+  if ($("#foesheet").open) openFoeSheet(); };
+// the foe's mon as the sheet shows it: a masked Ogerpon becomes the plain (Teal Mask) one
+function foeMon(m) {
+  if (!$("#hidemask").checked || !m || !/^オーガポン\(/.test(m.name || "")) return m;
+  return { ...m, name: "オーガポン", types: (m.types || []).slice(0, 1), colors: (m.colors || []).slice(0, 1),
+    types_ja: (m.types_ja || []).slice(0, 1), sprite: m.sprite_base || m.sprite };
+}
 
 function pic(m) {
   const bg = m.colors && m.colors.length ? (m.colors.length > 1 ? `linear-gradient(135deg, ${m.colors[0]} 50%, ${m.colors[1]} 50%)` : m.colors[0]) : "#888";
@@ -761,7 +773,7 @@ function renderPreview(s) {
   const b = s.board;
   if (!draft) draft = [];
   const mine = b.team.map((m) => `<div class="mon small pick ${draft.includes(m.index) ? "sel" : ""}" data-i="${m.index}" tabindex="0" role="button">${pic(m)}<div class="info"><div class="name">${esc(m.name)}${draft.includes(m.index) ? `<span class="num">${draft.indexOf(m.index) + 1}</span>` : ""}</div><div class="meta">${esc(m.item)}</div><div class="meta">テラ ${esc(m.tera_type)}</div></div></div>`).join("");
-  const foe = b.foe_preview.map((m) => `<div class="mon small">${pic(m)}<div class="info"><div class="name">${esc(m.name)}</div><div>${typeBadges(m)}</div></div></div>`).join("");
+  const foe = b.foe_preview.map(foeMon).map((m) => `<div class="mon small">${pic(m)}<div class="info"><div class="name">${esc(m.name)}</div><div>${typeBadges(m)}</div></div></div>`).join("");
   const adv = showAdvice && Array.isArray(s.advice) ? s.advice : null;
   const name = (i) => (b.team.find((m) => m.index === i) || {}).name || "?";
   const advRow = adviceBar(adv ? adv.map((i, n) => `${n + 1}. ${esc(name(i))}`).join("　") : "", !!adv);
@@ -926,7 +938,8 @@ function toBattle() {
 function foeSheetHtml(b) {
   if (!b || !b.foe_preview || !b.foe_preview.length) return `<p class="meta">対戦が始まると表示します。</p>`;
   const seen = new Set(b.foe_seen || []), down = new Set(b.foe_fainted || []);
-  const items = b.foe_preview.map((m, i) => {
+  const items = b.foe_preview.map((m0, i) => {
+    const m = seen.has(i) ? m0 : foeMon(m0);  // a mask shown in battle is no secret
     const mark = down.has(i) ? `<span class="mark out">選出確定・ひんし</span>` : seen.has(i) ? `<span class="mark in">選出確定</span>` : `<span class="mark unk">不明</span>`;
     return `<div class="mon small ${down.has(i) ? "fainted" : ""}">${pic(m)}<div class="info"><div class="name">${esc(m.name)}</div><div>${typeBadges(m)}</div>${mark}</div></div>`;
   }).join("");

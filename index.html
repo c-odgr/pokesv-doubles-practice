@@ -232,6 +232,12 @@ small.note { color:var(--sub); font-size:11px; }
 .summary .todo { color:var(--sub); }
 
 /* ---- log ---- */
+.rv-row { border-top:1px solid var(--line); padding:8px 0; }
+.rv-head { display:flex; gap:8px; align-items:baseline; justify-content:space-between; }
+.rv-kind, .rv-note, .rv-label { color:var(--sub); font-size:12px; }
+.rv-cols { display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:13px; margin:4px 0; }
+.rv-diff { font-weight:800; color:var(--accent); }
+.rv-out { font-size:13px; margin-top:4px; }
 .log { height:560px; overflow:auto; font-size:13px; line-height:1.55; white-space:pre-wrap; }
 .log .turn { color:var(--accent); font-weight:800; margin-top:6px; }
 .log .ev-faint { color:var(--low); font-weight:700; }
@@ -891,9 +897,64 @@ function renderOver(s) {
   $("#left").innerHTML = (s.board ? arenaHtml(s.board) : "") + `<div class="card" style="margin-top:10px"><h2>結果</h2>
     <p style="font-size:22px;font-weight:800;letter-spacing:-0.01em">${word}（${s.turns} ターン）</p>
     <details><summary>相手の AI（${esc(s.ai_label)}）が選んだ行動</summary><div class="log" style="height:auto;max-height:400px">${s.ai_log.map(esc).join("\n")}</div></details>
-    <p><button id="again">新しい対戦</button></p></div>`;
+    <p><button id="again">新しい対戦</button></p></div>` + reviewHtml(s);
   wireArena();
   $("#again").onclick = () => renderSetup();
+  wireReview();
+}
+
+// ---- 055: looking back at the battle ----
+const SIDE_JA = ["左", "右"];
+function reviewSide(said, diff) {
+  return said.map((t, i) => t === "（なし）" ? "" : `<div class="${diff[i] && diff[i].length ? "rv-diff" : ""}">${SIDE_JA[i]}: ${esc(t)}</div>`).join("");
+}
+function reviewHtml(s) {
+  const turns = s.review || [];
+  if (!turns.length) return "";
+  const rows = turns.map((r) => {
+    const diff = r.diff || [];
+    const kinds = [...new Set(diff.flat())];
+    return `<div class="rv-row"><div class="rv-head"><b>ターン ${r.turn}</b>
+        <span class="rv-kind">${!r.ai ? "AI の案なし" : kinds.length ? "違い: " + kinds.map(esc).join("・") : "同じ"}</span></div>
+      <div class="rv-cols"><div><div class="rv-label">あなた</div>${reviewSide(r.mine, diff)}</div>
+        <div><div class="rv-label">AI なら</div>${r.ai ? reviewSide(r.ai, diff) : "―"}</div></div>
+      ${kinds.length ? `<button class="rv-go" data-turn="${r.turn}">打ち直して比べる</button><div class="rv-out" id="rv${r.turn}"></div>` : ""}</div>`;
+  }).join("");
+  return `<div class="card" style="margin-top:10px"><h2>振り返り</h2>
+    <p class="rv-note">打ち直しは、その時にあなたに見えていた情報と AI の推測で盤面を組み直し、2 手目からは m035（ダメ計判断）どうしで最後まで打った勝率です。目安であって、AI の先読みと食い違うことがあります。</p>${rows}</div>`;
+}
+function reviewResult(r) {
+  if (r.error) return esc(r.error);
+  if (!r.counted) return r.done ? "打ち直しを最後まで打てなかったので、比べられません" : `${r.played} / ${r.games} 回…`;
+  const pct = (x) => Math.round(x * 100);
+  const signed = (x) => (x > 0 ? "+" : "") + pct(x);
+  const word = r.verdict === "mine" ? "あなたの手が良さそう" : r.verdict === "ai" ? "AI の手が良さそう" : "はっきりした差はない";
+  return `あなた <b>${pct(r.mine)}%</b> ／ AI <b>${pct(r.ai)}%</b>（差 ${signed(r.gap)}、幅 ${signed(r.low)}〜${signed(r.high)}、${r.counted} 回）`
+    + (r.done ? ` <b>${word}</b>` : ` … ${r.played} / ${r.games}`);
+}
+let reviewing = 0;  // only the latest comparison goes on
+function wireReview() {
+  document.querySelectorAll(".rv-go").forEach((button) => button.onclick = async () => {
+    const turn = +button.dataset.turn, out = $("#rv" + turn);
+    if (button.dataset.running) { reviewing++; return; }
+    const mine = ++reviewing;
+    button.dataset.running = "1"; button.textContent = "やめる";
+    out.textContent = "打ち直しています…";
+    try {
+      let r = null;
+      while (mine === reviewing && out.isConnected) {
+        r = await api("/api/review", { turn });
+        if (!r || r.turn !== turn) { out.textContent = "打ち直せませんでした"; break; }
+        out.innerHTML = reviewResult(r);
+        if (r.done) break;
+        await new Promise((ok) => setTimeout(ok, 0));
+      }
+    } catch (e) {
+      out.textContent = "打ち直しに失敗しました。もう一度押してください";
+    } finally {
+      delete button.dataset.running; button.textContent = "打ち直して比べる";
+    }
+  });
 }
 
 function renderWaiting() {

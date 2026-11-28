@@ -400,7 +400,7 @@ function renderSetup(msg) {
     <label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}><span>自分の手番に、最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する<br><span class="meta">学習用。対戦中にも切り替えられます</span></span></label></div>
     <button id="start">対戦を始める</button> <span class="err" id="err">${esc(msg || "")}</span>
     ${phoneUrl ? `<p class="phone">スマホで開く（同じ Wi-Fi）: <code>${esc(phoneUrl)}</code><br>鍵つきの URL です。他の人に見せないでください。</p>` : ""}
-    <p><small class="note">ポケモンの画像は同梱していません。遊ぶときにブラウザが PokeAPI/sprites から読み込みます（著作権は任天堂・クリーチャーズ・ゲームフリークにあります）。読み込めないときはタイプの色で表示します。</small></p></div>`;
+    <p><small class="note">ポケモンの画像は同梱していません。遊ぶときにブラウザが PokeAPI/sprites から読み込みます（著作権は任天堂・クリーチャーズ・ゲームフリークにあります）。読み込めないときはタイプの色で表示します。<br>非公式のファンメイドのツールです。<a href="licenses.html">権利とライセンス</a></small></p></div>`;
   const aidesc = () => { const a = options.ais.find((x) => x.id === $("#ai").value); $("#aidesc").textContent = a ? a.desc : ""; };
   $("#ai").onchange = aidesc; aidesc();
   $("#advset").onchange = (e) => setAdvice(e.target.checked);

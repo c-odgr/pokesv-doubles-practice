@@ -50,6 +50,8 @@ body.setup aside { display:none; }
 @media (max-width: 1499px) { body.setup .cols { grid-template-columns: minmax(0,1fr); } }
 @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
 .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; }
+.evaltable { border-collapse:collapse; font-size:14px; } .evaltable th, .evaltable td { border-bottom:1px solid var(--line); padding:4px 8px; text-align:right; white-space:nowrap; } .evaltable th:first-child, .evaltable td:first-child { text-align:left; } .evaltable th { font-size:12px; color:var(--sub); }
+@media (max-width: 600px) { .evaltable { font-size:12px; } .evaltable th, .evaltable td { padding:4px 3px; white-space:normal; } .evaltable th { font-size:11px; } .evaltable td .meta { display:block; font-size:11px; } }
 h2 { font-size:14px; margin:0 0 8px; color:var(--sub); }
 .row { display:flex; gap:10px; flex-wrap:wrap; }
 .mon { flex:1 1 230px; border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; gap:8px; min-width:0; }
@@ -373,19 +375,27 @@ function api(path, body) {
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 function renderSetup(msg) {
+  checking += 1;  // 056: an evaluation still running stops
   document.body.classList.add("setup");
   const ais = options.ais.map((a) => `<option value="${a.id}" ${a.id === options.default ? "selected" : ""}>${esc(a.label)}</option>`).join("");
   const teams = options.teams.map((t) => `<option value="${esc(t.id)}">${esc(t.id)}　${esc(t.names)}</option>`).join("");
-  const side = (k, title) => `<div class="sec ${k}"><h2>${title}</h2>
+  const side = (k, title, extra = "") => `<div class="sec ${k}"><h2>${title}</h2>
     <select id="${k}mode"><option value="build">自分で組む</option><option value="regf">大会のチーム</option><option value="text">テキストを貼る</option></select>
     <div id="${k}build"></div>
     <select id="${k}sel" style="width:100%;display:none">${teams}</select>
-    <textarea id="${k}txt" style="display:none" placeholder="Showdown 形式（英語名）のチームを貼る"></textarea></div>`;
+    <textarea id="${k}txt" style="display:none" placeholder="Showdown 形式（英語名）のチームを貼る"></textarea>${extra}</div>`;
+  const last = load("eval-last", null);
+  const evalBox = `<div class="evalbox">
+    <p style="margin:10px 0 4px"><button id="evalbtn" class="opt" style="display:inline-block;width:auto">このチームを調べる</button>
+    相手: <select id="evalpool" aria-label="調べる相手"><option value="top8">大会で8位以内の199チーム</option><option value="all">大会の全チームから199チーム</option></select></p>
+    <div class="err" id="evalerr" role="alert"></div>
+    ${last ? `<label class="advtoggle"><input type="checkbox" id="evalcmp" checked><span>前の結果（勝率 ${pct(last.win_rate)}、${last.opponents} チームと対戦）と比べる</span></label>` : ""}
+    <p class="meta" style="margin:4px 0">両側をダメ計判断 m035 が操作して約1,200戦します。PC で3分ほど。相手は不要です。</p></div>`;
   $("#left").innerHTML = `<div class="card"><h2>新しい対戦</h2>
     <datalist id="dl-species">${catalog.species.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
     <datalist id="dl-items">${catalog.items.map((s) => `<option value="${esc(s.name)}">`).join("")}</datalist>
-    <div class="cols">${side("mine", "あなたのチーム")}${side("foe", "相手のチーム")}</div>
-    <div class="sec ai"><h2>相手の AI</h2><p style="margin:0"><select id="ai" aria-label="相手の AI">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span><br><span class="meta">※ m の番号が新しいほど強い傾向にあります。</span></p></div>
+    <div class="cols">${side("mine", "あなたのチーム", evalBox)}${side("foe", "相手のチーム")}</div>
+    <div class="sec ai"><h2>相手の AI</h2><p style="margin:0"><select id="ai" aria-label="相手の AI">${ais}</select>　seed: <input type="text" id="seed" size="10" placeholder="空なら毎回ちがう"><br><span class="meta" id="aidesc"></span><br><span class="meta">※ m の番号が大きいほど強い傾向にあります（m055 は不具合の修正で、強さは m048 と同じくらい）。</span></p></div>
     <div class="sec opt"><h2>オプション設定</h2>
     <label class="advtoggle"><input type="checkbox" id="advset" ${showAdvice ? "checked" : ""}><span>自分の手番に、最新の AI（${esc(options.ais[options.ais.length - 1].label)}）なら何を選ぶかを表示する<br><span class="meta">学習用。対戦中にも切り替えられます</span></span></label></div>
     <button id="start">対戦を始める</button> <span class="err" id="err">${esc(msg || "")}</span>
@@ -402,19 +412,99 @@ function renderSetup(msg) {
       $(`#${k}txt`).style.display = mode.value === "text" ? "" : "none";
       try { localStorage.setItem("mode-" + k, mode.value); } catch (e) {} };
     mode.onchange = show; show(); renderBuilder(k);
+    for (const part of ["sel", "txt"]) {  // 056: the choice stays, to change a team and check again
+      const el = $(`#${k}${part}`), kept = load(part + "-" + k, null);
+      if (kept !== null) el.value = kept;
+      if (part === "sel" && !el.value) el.selectedIndex = 0;  // (the team is gone)
+      el.onchange = () => save(part + "-" + k, el.value);
+    }
   }
+  const pick = (k) => { const m = $(`#${k}mode`).value;
+    if (m === "build") return { members: builds[k].filter((x) => x.species).map(memberJson) };
+    return m === "regf" ? $(`#${k}sel`).value : $(`#${k}txt`).value; };
+  const warnOf = (k) => ($(`#${k}mode`).value === "build" ? builderWarnings(builds[k]) : []);
+  $("#evalpool").value = load("eval-pool", (last && last.record && last.record.pool) || "top8");
+  $("#evalpool").onchange = (e) => save("eval-pool", e.target.value);
+  $("#evalbtn").onclick = () => {
+    $("#evalerr").textContent = "";
+    const w = warnOf("mine");
+    if (w.length) { $("#evalerr").textContent = "自分のチームを直してください: " + w[0]; return; }
+    startCheck(pick("mine"), $("#evalpool").value, last && $("#evalcmp").checked ? last.record : null);
+  };
   $("#start").onclick = async () => {
     for (const k of ["mine", "foe"]) {
-      const w = $(`#${k}mode`).value === "build" ? builderWarnings(builds[k]) : [];
+      const w = warnOf(k);
       if (w.length) { $("#err").textContent = (k === "mine" ? "自分" : "相手") + "のチームを直してください: " + w[0]; return; }
     }
-    const pick = (k) => { const m = $(`#${k}mode`).value;
-      if (m === "build") return { members: builds[k].filter((x) => x.species).map(memberJson) };
-      return m === "regf" ? $(`#${k}sel`).value : $(`#${k}txt`).value; };
     const r = await api("/api/new", { mine: pick("mine"), foe: pick("foe"), ai: $("#ai").value, seed: $("#seed").value });
     if (!r.ok) { $("#err").textContent = r.error; return; }
     lastKey = ""; draft = null; poll();
   };
+}
+
+// ---- 056: how a team does against the tournament teams (one opponent per request) ----
+let checking = 0;  // only the latest evaluation goes on
+const pct = (x) => (x * 100).toFixed(1) + "%";
+const span = (ci) => `${(ci[0] * 100).toFixed(0)}〜${(ci[1] * 100).toFixed(0)}%`;
+const points = (x) => (x > 0 ? "+" : "") + (x * 100).toFixed(1);
+
+async function startCheck(team, pool, previous) {
+  const mine = ++checking;
+  clearTimeout(timer);
+  let started;
+  try { started = await api("/api/eval/start", { team, pool, previous }); }
+  catch (e) { started = { ok: false, error: String(e.message || e) }; }
+  if (mine !== checking) return;
+  if (!started.ok) { $("#evalerr").textContent = started.error; return; }
+  let report = started.report, failed = "", stopped = false;
+  const began = Date.now();
+  const keep = () => save("eval-last", { record: report.record, win_rate: report.win_rate, opponents: report.opponents });
+  const draw = () => {
+    const left = report.opponents ? Math.ceil((Date.now() - began) / report.opponents * (report.of - report.opponents) / 1000) : 0;
+    const running = !report.done && !stopped && !failed;
+    const state = running ? `調べています…　${report.opponents} / ${report.of} チーム${report.opponents > 2 ? `（残り約 ${left > 90 ? Math.ceil(left / 60) + " 分" : left + " 秒"}）` : ""}`
+      : report.done ? `${report.of} チームすべてと戦いました` : `${report.opponents} / ${report.of} チームで止めました`;
+    $("#left").innerHTML = `<div class="card"><h2>構築を調べる</h2>
+      <p role="status">${state}</p>${failed ? `<p class="err">${esc(failed)}</p>` : ""}
+      <progress max="${report.of}" value="${report.opponents}" style="width:100%"></progress>
+      ${checkHtml(report)}
+      <p style="margin-top:12px">${running ? `<button id="evalstop">やめる</button> ` : ""}
+        ${stopped && report.opponents >= report.min_compare ? `<button id="evalkeep">この結果を次の比較に使う</button> ` : ""}
+        <button id="evalback" class="opt" style="display:inline-block;width:auto">戻る</button></p></div>`;
+    if (running) $("#evalstop").onclick = () => { stopped = true; draw(); };
+    if ($("#evalkeep")) $("#evalkeep").onclick = (e) => { keep(); e.target.disabled = true; e.target.textContent = "保存しました"; };
+    $("#evalback").onclick = () => renderSetup();
+  };
+  draw();
+  while (!report.done && !stopped && !failed) {
+    let r;
+    try { r = await api("/api/eval/step", { id: started.id }); }
+    catch (e) { r = { ok: false, error: String(e.message || e) }; }
+    if (mine !== checking) return;
+    if (stopped) break;  // (the screen stays as it was when stopped)
+    if (r.ok) { report = r.report; if (report.done) keep(); } else failed = r.error;
+    draw();
+    await new Promise((ok) => setTimeout(ok, 0));  // let the page take a press of "やめる"
+  }
+}
+
+function checkHtml(r) {
+  if (!r.battles) return "";
+  const table = (head, rows) => `<div style="overflow-x:auto"><table class="evaltable"><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${rows.map((c) => `<tr>${c.map((x) => `<td>${x}</td>`).join("")}</tr>`).join("")}</table></div>`;
+  const c = r.compare;
+  const verdict = { better: "良くなったようです", worse: "悪くなったようです", none: "はっきりした差はありません" };
+  const compared = !c ? "" : c.error ? `<p class="meta">${esc(c.error)}</p>`
+    : `<h3>前の結果との比較</h3><p><b>${c.few ? `まだ判定できません（${r.min_compare} チーム以上で判定します）` : verdict[c.verdict]}</b><br>同じ ${c.opponents} チームに対して ${pct(c.before)} → ${pct(c.now)}（差 ${points(c.gap)} ポイント、95% の幅 ${points(c.ci[0])}〜${points(c.ci[1])}）</p>`;
+  return `<p style="font-size:22px;font-weight:800;margin:10px 0 0">勝率 ${pct(r.win_rate)}</p>
+    <p class="meta" style="margin:0">${r.battles} 戦（95% の幅 ${span(r.ci)}）${r.aborted ? `。うち ${r.aborted} 戦は途中で打ち切り（勝ちに数えていません）` : ""}</p>
+    ${compared}
+    <h3>勝ちにくい相手のポケモン</h3>
+    ${r.foes.length ? table(["相手のポケモン", "出てきた戦数", "その時の勝率", "全体との差"], r.foes.map((f) => [esc(f.name), f.brought, `${pct(f.win_rate)}<span class="meta">（${span(f.ci)}）</span>`, points(f.delta)])) : `<p class="meta">30 戦以上出てきて、全体より勝率が低いポケモンは、今はありません。</p>`}
+    <h3>先発の組み合わせ</h3>
+    ${r.leads.length ? table(["先発", "戦数", "勝率"], r.leads.map((l) => [l.names.map(esc).join("＋"), l.battles, `${pct(l.win_rate)}<span class="meta">（${span(l.ci)}）</span>`])) : `<p class="meta">20 戦以上になった組み合わせがまだありません。</p>`}
+    <h3>あなたのポケモン</h3>
+    ${table(["ポケモン", "選んだ戦数", "場に出た", "味方で最初に倒れた", "倒れた", "倒した数"], r.own.map((o) => [esc(o.name), o.brought, o.sent_in, o.first_fainted, o.fainted, o.knockouts]))}
+    <p class="meta" style="margin-top:10px">数字の読み方: 両側を<b>ダメ計判断 m035</b> が選出・操作した場合の勝率で、人が使った場合の勝率ではありません。AI が使いこなせない戦い方の構築は低く出ます。相手の努力値・性格は大会でよくある型で埋めています。表は傾向の目安です。技1つ程度の変更は、比べても「はっきりした差はない」になることが多いです。</p>`;
 }
 
 // ---- team builder (039): Japanese pull-downs, teams kept in this browser ----
